@@ -1,6 +1,6 @@
 # Arta
 
-Arta adalah aplikasi pencatatan keuangan pribadi berbasis Vite dan React. Aplikasi ini mencakup ringkasan keuangan, pencatatan pemasukan dan pengeluaran, serta wishlist dengan progres tabungan.
+Arta adalah aplikasi pencatatan keuangan pribadi berbasis Vite dan React. Aplikasi ini mencakup login lokal, ringkasan keuangan, pencatatan pemasukan dan pengeluaran, wishlist dengan progres tabungan, serta pengaturan tampilan.
 
 ## Menjalankan lokal
 

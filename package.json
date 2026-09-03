@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node scripts/self-check.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
