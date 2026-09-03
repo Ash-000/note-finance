@@ -38,6 +38,10 @@ const nav = [
   { id: 'settings', label: 'Pengaturan', icon: Gear },
 ]
 
+function BrandMark() {
+  return <span className="brand-mark"><img className="brand-logo" src="/finnote-logo.png" alt="" aria-hidden="true" /></span>
+}
+
 export default function App() {
   const [transactions, setTransactions] = useStoredState('arta-transactions-v2', [])
   const [goals, setGoals] = useStoredState('arta-goals-v2', [])
@@ -116,8 +120,8 @@ export default function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <button className="brand" onClick={() => setView('summary')} aria-label="Arta, ke ringkasan">
-          <span className="brand-mark"><ArrowUp size={22} weight="bold" /></span><span>Arta</span>
+        <button className="brand" onClick={() => setView('summary')} aria-label="FinNote, ke ringkasan">
+          <BrandMark /><span>FinNote</span>
         </button>
         <nav aria-label="Navigasi utama">
           {nav.map(({ id, label, icon: Icon }) => (
@@ -236,11 +240,11 @@ function SettingsPage({ theme, setTheme, onLogout, onClear }) {
       <div className="settings-icon"><ShieldCheck size={24} weight="duotone" /></div>
       <div><h2>Data dan sesi</h2><p>Kontrol data yang tersimpan pada browser ini.</p></div>
       <div className="setting-row"><div><strong>Hapus data keuangan</strong><span>Menghapus semua transaksi dan wishlist.</span></div><button className="danger-button" onClick={onClear}><Trash size={18} />Hapus data</button></div>
-      <div className="setting-row"><div><strong>Keluar dari Arta</strong><span>Data keuangan tetap tersimpan setelah keluar.</span></div><button className="secondary" onClick={onLogout}><SignOut size={18} />Keluar</button></div>
+      <div className="setting-row"><div><strong>Keluar dari FinNote</strong><span>Data keuangan tetap tersimpan setelah keluar.</span></div><button className="secondary" onClick={onLogout}><SignOut size={18} />Keluar</button></div>
     </section>
     </div>
     <aside className="settings-preview" aria-label={`Preview tema ${themeCopy.name}`}>
-      <div className="preview-glow" /><div className="preview-brand"><span><ArrowUp size={16} weight="bold" /></span>Arta</div>
+      <div className="preview-glow" /><div className="preview-brand"><BrandMark />FinNote</div>
       <div className="preview-copy"><span>TEMA AKTIF</span><strong>{themeCopy.name}</strong><p>{themeCopy.text} Diterapkan langsung ke seluruh ruang kerja.</p></div>
       <div className="preview-window"><div className="preview-window-head"><i /><i /><i /></div><div className="preview-window-body"><span /><span /><span /></div></div>
     </aside>
@@ -257,8 +261,8 @@ function LoginScreen({ onLogin }) {
     onLogin({ name: name.trim() })
   }
   return <main className="login-page">
-    <section className="login-copy t-stagger is-shown"><button className="brand login-brand" type="button"><span className="brand-mark"><ArrowUp size={22} weight="bold" /></span><span>Arta</span></button><div className="login-rings" aria-hidden="true"><span /><span /><span /><span /></div><div><p className="login-kicker t-stagger-line t-stagger-line--1">Keuangan pribadi</p><h1 className="t-stagger-line t-stagger-line--2">Uang lebih tertata.<br />Hidup lebih tenang.</h1><p className="login-description t-stagger-line t-stagger-line--3">Catat pemasukan, pengeluaran, dan target tanpa spreadsheet.</p></div><div className="login-foot"><ShieldCheck size={18} />Data tersimpan di browser perangkat ini</div></section>
-    <section className="login-form-wrap"><form className="login-card" onSubmit={submit}><div className="login-avatar"><UserCircle size={34} weight="duotone" /></div><h2>Selamat datang</h2><p>Masuk untuk membuka catatan keuanganmu.</p><Field label="Nama"><input autoFocus autoComplete="name" value={name} onChange={event => setName(event.target.value)} placeholder="Nama kamu" /></Field><Field label="PIN"><input type="password" inputMode="numeric" autoComplete="current-password" maxLength="4" value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, ''))} placeholder="4 digit PIN" /></Field>{error && <p className="form-error login-error" role="alert">{error}</p>}<button className="primary login-submit">Masuk ke Arta <span className="button-orb"><ArrowRight size={17} /></span></button><small>Login lokal. Tidak ada data yang dikirim ke server.</small></form></section>
+    <section className="login-copy t-stagger is-shown"><button className="brand login-brand" type="button"><BrandMark /><span>FinNote</span></button><div className="login-rings" aria-hidden="true"><span /><span /><span /><span /></div><div><p className="login-kicker t-stagger-line t-stagger-line--1">Keuangan pribadi</p><h1 className="t-stagger-line t-stagger-line--2">Uang lebih tertata.<br />Hidup lebih tenang.</h1><p className="login-description t-stagger-line t-stagger-line--3">Catat pemasukan, pengeluaran, dan target tanpa spreadsheet.</p></div><div className="login-foot"><ShieldCheck size={18} />Data tersimpan di browser perangkat ini</div></section>
+    <section className="login-form-wrap"><form className="login-card" onSubmit={submit}><div className="login-avatar"><UserCircle size={34} weight="duotone" /></div><h2>Selamat datang</h2><p>Masuk untuk membuka catatan keuanganmu.</p><Field label="Nama"><input autoFocus autoComplete="name" value={name} onChange={event => setName(event.target.value)} placeholder="Nama kamu" /></Field><Field label="PIN"><input type="password" inputMode="numeric" autoComplete="current-password" maxLength="4" value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, ''))} placeholder="4 digit PIN" /></Field>{error && <p className="form-error login-error" role="alert">{error}</p>}<button className="primary login-submit">Masuk ke FinNote <span className="button-orb"><ArrowRight size={17} /></span></button><small>Login lokal. Tidak ada data yang dikirim ke server.</small></form></section>
   </main>
 }
 
