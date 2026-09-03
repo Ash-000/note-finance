@@ -47,7 +47,7 @@ const periodOptions = [
 ]
 
 function BrandMark() {
-  return <span className="brand-mark"><img className="brand-logo" src="/finnote-logo.png" alt="" aria-hidden="true" /></span>
+  return <span className="brand-mark"><img className="brand-logo" src="/finnote-logo.png" width="768" height="768" alt="" aria-hidden="true" /></span>
 }
 
 export default function App() {
@@ -149,7 +149,8 @@ export default function App() {
 
       <main>
         <header className="topbar">
-          <div><p className="eyebrow">{monthLabel.format(new Date())}</p><h1>{view === 'summary' ? `Selamat datang, ${firstName}` : title}</h1></div>
+          <button className="mobile-brand" onClick={() => setView('summary')} aria-label="FinNote, ke ringkasan"><BrandMark /><span><strong>FinNote</strong><small>Catatan keuangan</small></span></button>
+          <div className="topbar-copy"><p className="eyebrow">{monthLabel.format(new Date())}</p><h1>{view === 'summary' ? `Selamat datang, ${firstName}` : title}</h1></div>
           <div className="header-actions">
             <button className="icon-button" onClick={() => setTheme(activeTheme === 'deep-ocean' ? 'cool-grey' : 'deep-ocean')} aria-label={`Ganti ke tema ${activeTheme === 'deep-ocean' ? 'Cool Grey' : 'Deep Ocean'}`} title={`Tema ${activeTheme === 'deep-ocean' ? 'Deep Ocean' : 'Cool Grey'}`}><Palette size={20} /></button>
             <button className="icon-button notification" aria-label="Notifikasi"><Bell size={20} /></button>
