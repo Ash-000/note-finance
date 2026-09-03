@@ -6,6 +6,16 @@ export const formatAmountInput = value => normalizeAmount(value).replace(/\B(?=(
 
 export const normalizeTheme = value => value === 'cool-grey' ? 'cool-grey' : 'deep-ocean'
 
+export const buildDonutStops = (values, total) => {
+  if (!total) return ''
+  let cursor = 0
+  return values.map((value, index) => {
+    const start = Number(cursor.toFixed(2))
+    cursor += ((Number(value) || 0) / total) * 360
+    return `var(--chart-${index + 1}) ${start}deg ${Number(cursor.toFixed(2))}deg`
+  }).join(', ')
+}
+
 export const isDateInPeriod = (value, period, now = new Date()) => {
   const date = new Date(`${value}T00:00:00`)
   if (Number.isNaN(date.getTime())) return false

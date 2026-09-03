@@ -5,7 +5,7 @@ import {
   House, MagnifyingGlass, PencilSimple, Plus, Receipt, ShoppingCart,
   Palette, ShieldCheck, SignOut, Trash, TrendDown, TrendUp, UserCircle, Wallet, X,
 } from '@phosphor-icons/react'
-import { amountSizeClass, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount, normalizeTheme } from './validation'
+import { amountSizeClass, buildDonutStops, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount, normalizeTheme } from './validation'
 
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
 const dateLabel = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -181,8 +181,12 @@ function Summary({ transactions, goals, totals, setView, openModal }) {
   const spentPercent = totals.income ? Math.min(Math.round((totals.expense / totals.income) * 100), 100) : 0
   const categories = useMemo(() => {
     const sums = transactions.filter(t => t.type === 'expense').reduce((acc, item) => ({ ...acc, [item.category]: (acc[item.category] || 0) + item.amount }), {})
-    return Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, 4)
+    const sorted = Object.entries(sums).sort((a, b) => b[1] - a[1])
+    return sorted.length > 4
+      ? [...sorted.slice(0, 3), ['Lainnya', sorted.slice(3).reduce((total, [, value]) => total + value, 0)]]
+      : sorted
   }, [transactions])
+  const donutStops = buildDonutStops(categories.map(([, value]) => value), totals.expense)
   return (
     <div className="dashboard-grid">
       <section className="balance-card">
@@ -197,7 +201,7 @@ function Summary({ transactions, goals, totals, setView, openModal }) {
         </div>
         <div className="chart-column">
           <div className="chart-head"><span>Pengeluaran</span><button onClick={() => setView('expense')}>Detail</button></div>
-          <div className="donut" aria-hidden="true" style={{ '--angle': `${categories.length ? Math.min((categories[0][1] / totals.expense) * 360, 360) : 0}deg` }} />
+          <div className="donut" aria-hidden="true" style={donutStops ? { '--donut-fill': `conic-gradient(from -90deg, ${donutStops})` } : undefined} />
           <div className="legend">{categories.length ? categories.map(([name, value]) => <div key={name}><span>{name}</span><strong>{rupiah.format(value)}</strong></div>) : <p className="chart-empty">Belum ada pengeluaran</p>}</div>
         </div>
       </section>

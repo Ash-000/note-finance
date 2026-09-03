@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { amountSizeClass, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount, normalizeTheme } from '../src/validation.js'
+import { amountSizeClass, buildDonutStops, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount, normalizeTheme } from '../src/validation.js'
 
 assert.equal(isValidLogin('Raka', '1234'), true)
 assert.equal(isValidLogin('R', '1234'), false)
@@ -14,6 +14,8 @@ assert.equal(amountSizeClass(1000000000000), 'amount-long')
 assert.equal(normalizeTheme('cool-grey'), 'cool-grey')
 assert.equal(normalizeTheme('deep-ocean'), 'deep-ocean')
 assert.equal(normalizeTheme('dark'), 'deep-ocean')
+assert.equal(buildDonutStops([75, 25], 100), 'var(--chart-1) 0deg 270deg, var(--chart-2) 270deg 360deg')
+assert.equal(buildDonutStops([], 0), '')
 const referenceDate = new Date('2026-09-03T12:00:00')
 assert.equal(isDateInPeriod('2026-09-03', 'day', referenceDate), true)
 assert.equal(isDateInPeriod('2026-09-02', 'day', referenceDate), false)
