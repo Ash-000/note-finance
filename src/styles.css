@@ -272,14 +272,6 @@ main { margin-left: 260px; padding-top: 42px; }
 .balance-main .budget-line { max-width: 520px; margin: 27px 0 9px; background: rgba(35,71,45,.13); }
 .balance-main .budget-line span { background: #315f3d; }
 .balance-main small { color: #647467; }
-.balance-art { position: relative; z-index: 1; min-height: 340px; overflow: hidden; }
-.orbit { position: absolute; border: 1px solid rgba(35,71,45,.16); border-radius: 50%; animation: breathe 6s ease-in-out infinite; }
-.orbit-one { width: 310px; height: 310px; right: -30px; top: 16px; }
-.orbit-two { width: 225px; height: 225px; right: 12px; top: 59px; animation-delay: -1.4s; }
-.orbit-three { width: 138px; height: 138px; right: 55px; top: 102px; animation-delay: -2.8s; }
-.leaf { position: absolute; width: 45px; height: 95px; border-radius: 100% 0 100% 0; background: #8ead82; opacity: .42; transform: rotate(34deg); }
-.leaf-one { right: 103px; top: 124px; }
-.leaf-two { right: 72px; top: 176px; transform: rotate(124deg) scale(.72); background: #b4cc73; }
 .chart-column { position: relative; z-index: 2; margin: 26px; padding: 25px !important; border-radius: 18px; background: rgba(255,255,255,.66); backdrop-filter: blur(14px); align-self: center; }
 .panel { border-radius: 22px; padding: 26px; }
 .panel:hover { border-color: color-mix(in srgb, var(--accent) 24%, var(--border)); }
@@ -353,7 +345,7 @@ main { margin-left: 260px; padding-top: 42px; }
   .hero-totals strong { color: #fff; font-size: 15px; }
   .balance-main .budget-line { background: rgba(255,255,255,.14); }
   .balance-main .budget-line span { background: var(--lime); }
-  .balance-art, .chart-column { display: none; }
+  .chart-column { display: none; }
   .empty-state { min-height: 285px; padding-inline: 8px; }
   .empty-state p { max-width: 290px; }
   .settings-grid { display: block; }
@@ -489,9 +481,6 @@ body { background: var(--bg); }
 .hero-totals strong { color: var(--hero-text); }
 .balance-main .budget-line { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .balance-main .budget-line span { background: var(--accent); }
-.orbit { border-color: color-mix(in srgb, var(--accent) 18%, transparent); }
-.leaf { background: var(--accent); }
-.leaf-two { background: var(--highlight); }
 .chart-column { background: color-mix(in srgb, var(--surface) 72%, transparent); }
 .wishlist-heading { background: var(--accent); }
 .wishlist-heading .primary { color: var(--accent-strong); }
@@ -562,6 +551,7 @@ body { background: var(--bg); }
 .legend { gap: 8px; }
 .legend div { font-size: 11px; }
 .legend strong { font-family: var(--number-font); font-variant-numeric: tabular-nums; letter-spacing: -.015em; }
+.chart-empty { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
 .brand-mark,
 .sidebar .brand-mark,
@@ -579,7 +569,31 @@ body { background: var(--bg); }
   .mobile-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .balance-card,
   .login-page { background: var(--sidebar); }
+  .balance-card { min-height: 0; }
+  .balance-main { min-height: 0; color: #fff; }
+  .balance-main .balance-value,
+  .hero-totals strong { color: #fff; }
+  .balance-main .balance-heading p,
+  .hero-totals p,
+  .balance-main small { color: rgba(255, 255, 255, .68); }
   .balance-main .budget-line span { background: var(--highlight); }
+  .chart-column {
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr);
+    gap: 14px;
+    min-height: 0;
+    margin: 0 16px 16px;
+    padding: 16px !important;
+    border-radius: 16px;
+    background: var(--surface);
+    color: var(--text);
+    backdrop-filter: none;
+  }
+  .chart-head { margin-bottom: 2px; }
+  .donut { width: 64px; }
+  .donut::before { width: 52px; }
+  .legend { gap: 6px; }
+  .legend div { font-size: 10px; }
   .wishlist-heading { flex-direction: column; align-items: stretch; gap: 20px; }
   .wishlist-heading .primary {
     width: 100%;

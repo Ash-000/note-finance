@@ -186,13 +186,11 @@ function Summary({ transactions, goals, totals, setView, openModal }) {
           </div>
           <div className="budget-line"><span style={{ width: `${spentPercent}%` }} /></div><small>{spentPercent}% pemasukan sudah digunakan</small>
         </div>
-        {categories.length === 0 ? <div className="balance-art" aria-hidden="true">
-          <span className="orbit orbit-one" /><span className="orbit orbit-two" /><span className="orbit orbit-three" />
-          <span className="leaf leaf-one" /><span className="leaf leaf-two" />
-        </div> : <div className="chart-column">
+        <div className="chart-column">
           <div className="chart-head"><span>Pengeluaran</span><button onClick={() => setView('expense')}>Detail</button></div>
-          <div className="donut" aria-hidden="true" style={{ '--angle': `${Math.min((categories[0][1] / totals.expense) * 360, 360)}deg` }} /><div className="legend">{categories.map(([name, value]) => <div key={name}><span>{name}</span><strong>{rupiah.format(value)}</strong></div>)}</div>
-        </div>}
+          <div className="donut" aria-hidden="true" style={{ '--angle': `${categories.length ? Math.min((categories[0][1] / totals.expense) * 360, 360) : 0}deg` }} />
+          <div className="legend">{categories.length ? categories.map(([name, value]) => <div key={name}><span>{name}</span><strong>{rupiah.format(value)}</strong></div>) : <p className="chart-empty">Belum ada pengeluaran</p>}</div>
+        </div>
       </section>
       <div className="quick-actions">
         <button className="quick income" onClick={() => openModal({ kind: 'transaction', type: 'income' })}><span><ArrowDown size={23} /></span><div><strong>Pemasukan</strong><small>Tambah pemasukan</small></div></button>
