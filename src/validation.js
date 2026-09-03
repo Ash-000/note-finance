@@ -4,6 +4,8 @@ export const normalizeAmount = value => String(value ?? '').replace(/\D/g, '').r
 
 export const formatAmountInput = value => normalizeAmount(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
+export const normalizeTheme = value => value === 'cool-grey' ? 'cool-grey' : 'deep-ocean'
+
 export const amountSizeClass = value => {
   const length = normalizeAmount(Math.abs(Number(value) || 0)).length
   return length >= 13 ? 'amount-long' : length >= 10 ? 'amount-medium' : ''

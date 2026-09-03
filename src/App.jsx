@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDown, ArrowRight, ArrowUp, Bank, Bell, BookOpen, Briefcase, CalendarBlank, Camera,
   CaretDown, ChartDonut, Check, Coffee, DotsThree, Gear, Gift, Heart,
-  House, MagnifyingGlass, Moon, PencilSimple, Plus, Receipt, ShoppingCart,
-  Palette, ShieldCheck, SignOut, Sun, Trash, TrendDown, TrendUp, UserCircle, Wallet, X,
+  House, MagnifyingGlass, PencilSimple, Plus, Receipt, ShoppingCart,
+  Palette, ShieldCheck, SignOut, Trash, TrendDown, TrendUp, UserCircle, Wallet, X,
 } from '@phosphor-icons/react'
-import { amountSizeClass, formatAmountInput, isValidLogin, normalizeAmount } from './validation'
+import { amountSizeClass, formatAmountInput, isValidLogin, normalizeAmount, normalizeTheme } from './validation'
 
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
 const dateLabel = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -42,14 +42,19 @@ export default function App() {
   const [transactions, setTransactions] = useStoredState('arta-transactions-v2', [])
   const [goals, setGoals] = useStoredState('arta-goals-v2', [])
   const [session, setSession] = useStoredState('arta-session', null)
-  const [background, setBackground] = useStoredState('arta-background', '#f5f7f3')
   const [view, setView] = useState('summary')
   const [modal, setModal] = useState(null)
   const [toast, setToast] = useState('')
-  const [theme, setTheme] = useStoredState('arta-theme', 'light')
+  const [theme, setTheme] = useStoredState('arta-theme', 'deep-ocean')
+  const activeTheme = normalizeTheme(theme)
 
-  useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
-  useEffect(() => { document.documentElement.style.setProperty('--custom-bg', background) }, [background])
+  useEffect(() => {
+    document.documentElement.dataset.theme = activeTheme
+    document.documentElement.style.removeProperty('--custom-bg')
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', activeTheme === 'cool-grey' ? '#37474F' : '#0D47A1')
+    localStorage.removeItem('arta-background')
+    if (theme !== activeTheme) setTheme(activeTheme)
+  }, [activeTheme, setTheme, theme])
   useEffect(() => {
     localStorage.removeItem('arta-transactions')
     localStorage.removeItem('arta-goals')
@@ -106,7 +111,7 @@ export default function App() {
       ? <TransactionsPage type={view} transactions={transactions} total={view === 'income' ? totals.income : totals.expense} openModal={setModal} onDelete={deleteTransaction} />
       : view === 'wishlist'
         ? <WishlistPage goals={goals} openModal={setModal} onDelete={deleteGoal} />
-        : <SettingsPage theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} onLogout={() => setSession(null)} onClear={() => { if (window.confirm('Hapus seluruh transaksi dan wishlist?')) { setTransactions([]); setGoals([]); setToast('Semua data keuangan dihapus') } }} />
+        : <SettingsPage theme={activeTheme} setTheme={setTheme} onLogout={() => setSession(null)} onClear={() => { if (window.confirm('Hapus seluruh transaksi dan wishlist?')) { setTransactions([]); setGoals([]); setToast('Semua data keuangan dihapus') } }} />
 
   return (
     <div className="app-shell">
@@ -134,7 +139,7 @@ export default function App() {
         <header className="topbar">
           <div><p className="eyebrow">{monthLabel.format(new Date())}</p><h1>{view === 'summary' ? `Selamat datang, ${firstName}` : title}</h1></div>
           <div className="header-actions">
-            <button className="icon-button" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Ganti tema">{theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
+            <button className="icon-button" onClick={() => setTheme(activeTheme === 'deep-ocean' ? 'cool-grey' : 'deep-ocean')} aria-label={`Ganti ke tema ${activeTheme === 'deep-ocean' ? 'Cool Grey' : 'Deep Ocean'}`} title={`Tema ${activeTheme === 'deep-ocean' ? 'Deep Ocean' : 'Cool Grey'}`}><Palette size={20} /></button>
             <button className="icon-button notification" aria-label="Notifikasi"><Bell size={20} /></button>
             <button className="primary header-cta" onClick={() => setModal({ kind: 'transaction', type: view === 'expense' ? 'expense' : 'income' })}>Catat transaksi<span className="button-orb"><Plus size={17} weight="bold" /></span></button>
           </div>
@@ -216,15 +221,16 @@ function WishlistPage({ goals, openModal, onDelete }) {
   </div>
 }
 
-function SettingsPage({ theme, setTheme, background, setBackground, onLogout, onClear }) {
-  const presets = ['#f5f7f3', '#f2f5f8', '#f8f4ef', '#f6f1f7', '#eef7f5']
+function SettingsPage({ theme, setTheme, onLogout, onClear }) {
+  const themeCopy = theme === 'cool-grey'
+    ? { name: 'Cool Grey', text: 'Teknologi, inovatif, dan bersih.' }
+    : { name: 'Deep Ocean', text: 'Terpercaya, stabil, dan profesional.' }
   return <div className="settings-grid">
     <div className="settings-content">
     <section className="panel settings-section">
       <div className="settings-icon"><Palette size={24} weight="duotone" /></div>
       <div><h2>Tampilan</h2><p>Sesuaikan aplikasi agar lebih nyaman dilihat.</p></div>
-      <div className="setting-row"><div><strong>Mode warna</strong><span>Pilih tema terang atau gelap.</span></div><div className="theme-switch"><button className={theme === 'light' ? 'active' : ''} onClick={() => setTheme('light')}><Sun size={17} />Terang</button><button className={theme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')}><Moon size={17} />Gelap</button></div></div>
-      <div className="setting-row background-setting"><div><strong>Warna background</strong><span>Pilih preset atau tentukan warna sendiri.</span></div><div className="color-options">{presets.map(color => <button key={color} className={background === color ? 'active' : ''} style={{ backgroundColor: color }} onClick={() => setBackground(color)} aria-label={`Pilih warna ${color}`} />)}<label className="custom-color" title="Pilih warna lain"><input type="color" value={background} onChange={event => setBackground(event.target.value)} /><Plus size={18} /></label></div></div>
+      <div className="setting-row theme-setting"><div><strong>Tema warna</strong><span>Dua palet minimal untuk seluruh aplikasi.</span></div><div className="palette-options" role="radiogroup" aria-label="Tema warna"><button className={`palette-option deep-ocean-option ${theme === 'deep-ocean' ? 'active' : ''}`} onClick={() => setTheme('deep-ocean')} role="radio" aria-checked={theme === 'deep-ocean'}><span className="palette-swatches" aria-hidden="true"><i /><i /><i /></span><span><strong>Deep Ocean</strong><small>Stabil & profesional</small></span>{theme === 'deep-ocean' && <Check size={18} weight="bold" />}</button><button className={`palette-option cool-grey-option ${theme === 'cool-grey' ? 'active' : ''}`} onClick={() => setTheme('cool-grey')} role="radio" aria-checked={theme === 'cool-grey'}><span className="palette-swatches" aria-hidden="true"><i /><i /><i /></span><span><strong>Cool Grey</strong><small>Bersih & inovatif</small></span>{theme === 'cool-grey' && <Check size={18} weight="bold" />}</button></div></div>
     </section>
     <section className="panel settings-section">
       <div className="settings-icon"><ShieldCheck size={24} weight="duotone" /></div>
@@ -233,9 +239,9 @@ function SettingsPage({ theme, setTheme, background, setBackground, onLogout, on
       <div className="setting-row"><div><strong>Keluar dari Arta</strong><span>Data keuangan tetap tersimpan setelah keluar.</span></div><button className="secondary" onClick={onLogout}><SignOut size={18} />Keluar</button></div>
     </section>
     </div>
-    <aside className="settings-preview" style={{ backgroundColor: background }} aria-label="Preview warna background">
+    <aside className="settings-preview" aria-label={`Preview tema ${themeCopy.name}`}>
       <div className="preview-glow" /><div className="preview-brand"><span><ArrowUp size={16} weight="bold" /></span>Arta</div>
-      <div className="preview-copy"><span>PREVIEW LANGSUNG</span><strong>Nyaman dilihat,<br />sesuai gayamu.</strong><p>Perubahan warna langsung diterapkan ke seluruh ruang kerja.</p></div>
+      <div className="preview-copy"><span>TEMA AKTIF</span><strong>{themeCopy.name}</strong><p>{themeCopy.text} Diterapkan langsung ke seluruh ruang kerja.</p></div>
       <div className="preview-window"><div className="preview-window-head"><i /><i /><i /></div><div className="preview-window-body"><span /><span /><span /></div></div>
     </aside>
   </div>
