@@ -673,7 +673,28 @@ body { background: var(--bg); }
     box-shadow: 0 20px 48px color-mix(in srgb, var(--sidebar) 22%, transparent);
   }
   .balance-main { padding: 24px 22px 18px !important; }
-  .month-chip { min-width: 44px; min-height: 44px; justify-content: center; }
+  .balance-heading .section-icon {
+    background: rgba(255, 255, 255, .16);
+    border: 1px solid rgba(255, 255, 255, .22);
+    color: #fff;
+  }
+  .month-chip {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    background: rgba(255, 255, 255, .14);
+    border-color: rgba(255, 255, 255, .22);
+    color: #fff;
+  }
+  .hero-totals .semantic {
+    background: rgba(255, 255, 255, .15);
+    border: 1px solid rgba(255, 255, 255, .12);
+  }
+  .hero-totals .semantic.income { color: #5ee6bc; }
+  .hero-totals .semantic.expense { color: #ff8b87; }
+  .balance-heading .section-icon svg,
+  .month-chip svg,
+  .hero-totals .semantic svg { width: 20px; height: 20px; stroke-width: 2.2; }
   .chart-column { margin: 0 12px 12px; border: 1px solid color-mix(in srgb, var(--highlight) 20%, var(--border)); box-shadow: 0 12px 28px rgba(0, 0, 0, .08); }
   .quick-actions { gap: 12px; margin-block: 16px 24px; }
   .quick {
