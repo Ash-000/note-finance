@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { amountSizeClass, formatAmountInput, isValidLogin, normalizeAmount, normalizeTheme } from '../src/validation.js'
+import { amountSizeClass, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount, normalizeTheme } from '../src/validation.js'
 
 assert.equal(isValidLogin('Raka', '1234'), true)
 assert.equal(isValidLogin('R', '1234'), false)
@@ -14,5 +14,15 @@ assert.equal(amountSizeClass(1000000000000), 'amount-long')
 assert.equal(normalizeTheme('cool-grey'), 'cool-grey')
 assert.equal(normalizeTheme('deep-ocean'), 'deep-ocean')
 assert.equal(normalizeTheme('dark'), 'deep-ocean')
+const referenceDate = new Date('2026-09-03T12:00:00')
+assert.equal(isDateInPeriod('2026-09-03', 'day', referenceDate), true)
+assert.equal(isDateInPeriod('2026-09-02', 'day', referenceDate), false)
+assert.equal(isDateInPeriod('2026-08-31', 'week', referenceDate), true)
+assert.equal(isDateInPeriod('2026-09-07', 'week', referenceDate), false)
+assert.equal(isDateInPeriod('2026-09-01', 'month', referenceDate), true)
+assert.equal(isDateInPeriod('2026-08-31', 'month', referenceDate), false)
+assert.equal(isDateInPeriod('2026-01-01', 'year', referenceDate), true)
+assert.equal(isDateInPeriod('2025-12-31', 'year', referenceDate), false)
+assert.equal(isDateInPeriod('2025-12-31', 'all', referenceDate), true)
 
 console.log('Self-check passed')

@@ -552,6 +552,9 @@ body { background: var(--bg); }
 .legend div { font-size: 11px; }
 .legend strong { font-family: var(--number-font); font-variant-numeric: tabular-nums; letter-spacing: -.015em; }
 .chart-empty { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.list-toolbar { grid-template-columns: minmax(200px, 1fr) auto auto auto; }
+.period-filter { min-width: 145px; }
+.category-filter { min-width: 170px; }
 
 .brand-mark,
 .sidebar .brand-mark,
@@ -594,6 +597,11 @@ body { background: var(--bg); }
   .donut::before { width: 52px; }
   .legend { gap: 6px; }
   .legend div { font-size: 10px; }
+  .list-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .list-toolbar .period-filter { grid-column: 1 / -1; grid-row: 2; }
+  .list-toolbar .category-filter { grid-column: 1 / -1; grid-row: 3; }
+  .period-filter,
+  .category-filter { min-width: 0; width: 100%; }
   .wishlist-heading { flex-direction: column; align-items: stretch; gap: 20px; }
   .wishlist-heading .primary {
     width: 100%;

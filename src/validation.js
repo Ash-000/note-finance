@@ -6,6 +6,23 @@ export const formatAmountInput = value => normalizeAmount(value).replace(/\B(?=(
 
 export const normalizeTheme = value => value === 'cool-grey' ? 'cool-grey' : 'deep-ocean'
 
+export const isDateInPeriod = (value, period, now = new Date()) => {
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return false
+  if (period === 'all') return true
+  if (period === 'day') return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
+  if (period === 'month') return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+  if (period === 'year') return date.getFullYear() === now.getFullYear()
+  if (period === 'week') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+    const end = new Date(start)
+    end.setDate(end.getDate() + 7)
+    return date >= start && date < end
+  }
+  return false
+}
+
 export const amountSizeClass = value => {
   const length = normalizeAmount(Math.abs(Number(value) || 0)).length
   return length >= 13 ? 'amount-long' : length >= 10 ? 'amount-medium' : ''

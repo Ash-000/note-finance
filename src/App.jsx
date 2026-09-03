@@ -5,7 +5,7 @@ import {
   House, MagnifyingGlass, PencilSimple, Plus, Receipt, ShoppingCart,
   Palette, ShieldCheck, SignOut, Trash, TrendDown, TrendUp, UserCircle, Wallet, X,
 } from '@phosphor-icons/react'
-import { amountSizeClass, formatAmountInput, isValidLogin, normalizeAmount, normalizeTheme } from './validation'
+import { amountSizeClass, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount, normalizeTheme } from './validation'
 
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
 const dateLabel = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -36,6 +36,14 @@ const nav = [
   { id: 'expense', label: 'Pengeluaran', icon: TrendDown },
   { id: 'wishlist', label: 'Wishlist', icon: Heart },
   { id: 'settings', label: 'Pengaturan', icon: Gear },
+]
+
+const periodOptions = [
+  { value: 'day', label: 'Hari ini' },
+  { value: 'week', label: 'Minggu ini' },
+  { value: 'month', label: 'Bulan ini' },
+  { value: 'year', label: 'Tahun ini' },
+  { value: 'all', label: 'Semua waktu' },
 ]
 
 function BrandMark() {
@@ -112,7 +120,7 @@ export default function App() {
   const page = view === 'summary'
     ? <Summary transactions={transactions} goals={goals} totals={totals} setView={setView} openModal={setModal} />
     : view === 'income' || view === 'expense'
-      ? <TransactionsPage type={view} transactions={transactions} total={view === 'income' ? totals.income : totals.expense} openModal={setModal} onDelete={deleteTransaction} />
+      ? <TransactionsPage type={view} transactions={transactions} openModal={setModal} onDelete={deleteTransaction} />
       : view === 'wishlist'
         ? <WishlistPage goals={goals} openModal={setModal} onDelete={deleteGoal} />
         : <SettingsPage theme={activeTheme} setTheme={setTheme} onLogout={() => setSession(null)} onClear={() => { if (window.confirm('Hapus seluruh transaksi dan wishlist?')) { setTransactions([]); setGoals([]); setToast('Semua data keuangan dihapus') } }} />
@@ -202,15 +210,19 @@ function Summary({ transactions, goals, totals, setView, openModal }) {
   )
 }
 
-function TransactionsPage({ type, transactions, total, openModal, onDelete }) {
+function TransactionsPage({ type, transactions, openModal, onDelete }) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Semua kategori')
-  const filtered = transactions.filter(item => item.type === type && (category === 'Semua kategori' || item.category === category) && `${item.title} ${item.category}`.toLowerCase().includes(query.toLowerCase()))
+  const [period, setPeriod] = useState('month')
+  const periodTransactions = transactions.filter(item => item.type === type && isDateInPeriod(item.date, period))
+  const filtered = periodTransactions.filter(item => (category === 'Semua kategori' || item.category === category) && `${item.title} ${item.category}`.toLowerCase().includes(query.toLowerCase()))
   const categories = [...new Set(transactions.filter(item => item.type === type).map(item => item.category))]
+  const total = periodTransactions.reduce((sum, item) => sum + item.amount, 0)
+  const activePeriod = periodOptions.find(item => item.value === period)?.label.toLowerCase()
   return <div className="page-stack">
-    <section className={`total-banner ${type}`}><div><p>Total {type === 'income' ? 'pemasukan' : 'pengeluaran'}</p><strong className={amountSizeClass(total)}>{rupiah.format(total)}</strong><small>{transactions.filter(item => item.type === type).length} transaksi tercatat</small></div><span>{type === 'income' ? <TrendUp size={34} /> : <TrendDown size={34} />}</span></section>
-    <section className="panel table-panel"><div className="list-toolbar"><div className="search"><MagnifyingGlass size={19} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Cari transaksi..." aria-label="Cari transaksi" /></div><div className="select-wrap"><select value={category} onChange={event => setCategory(event.target.value)} aria-label="Filter kategori"><option>Semua kategori</option>{categories.map(item => <option key={item}>{item}</option>)}</select><CaretDown size={16} /></div><button className="primary" onClick={() => openModal({ kind: 'transaction', type })}><Plus size={18} />Tambah</button></div>
-      {filtered.length ? <div className="transaction-list detailed">{filtered.map(item => <TransactionRow key={item.id} item={item} actions onEdit={() => openModal({ kind: 'transaction', item, type })} onDelete={() => onDelete(item.id)} />)}</div> : <EmptyState icon={MagnifyingGlass} title="Tidak ada transaksi" text={query ? 'Coba kata kunci atau filter yang berbeda.' : 'Mulai dengan menambahkan transaksi baru.'} />}
+    <section className={`total-banner ${type}`}><div><p>Total {type === 'income' ? 'pemasukan' : 'pengeluaran'} · {activePeriod}</p><strong className={amountSizeClass(total)}>{rupiah.format(total)}</strong><small>{periodTransactions.length} transaksi tercatat</small></div><span>{type === 'income' ? <TrendUp size={34} /> : <TrendDown size={34} />}</span></section>
+    <section className="panel table-panel"><div className="list-toolbar"><div className="search"><MagnifyingGlass size={19} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Cari transaksi..." aria-label="Cari transaksi" /></div><div className="select-wrap period-filter"><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Filter periode">{periodOptions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><CaretDown size={16} /></div><div className="select-wrap category-filter"><select value={category} onChange={event => setCategory(event.target.value)} aria-label="Filter kategori"><option>Semua kategori</option>{categories.map(item => <option key={item}>{item}</option>)}</select><CaretDown size={16} /></div><button className="primary" onClick={() => openModal({ kind: 'transaction', type })}><Plus size={18} />Tambah</button></div>
+      {filtered.length ? <div className="transaction-list detailed">{filtered.map(item => <TransactionRow key={item.id} item={item} actions onEdit={() => openModal({ kind: 'transaction', item, type })} onDelete={() => onDelete(item.id)} />)}</div> : <EmptyState icon={MagnifyingGlass} title="Tidak ada transaksi" text={query || category !== 'Semua kategori' ? 'Coba kata kunci atau filter yang berbeda.' : `Belum ada transaksi untuk ${activePeriod}.`} />}
     </section>
   </div>
 }
