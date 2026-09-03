@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDown, ArrowRight, ArrowUp, Bank, Bell, BookOpen, Briefcase, CalendarBlank, Camera,
-  CaretDown, ChartDonut, Check, Coffee, DotsThree, Gear, Gift, Heart,
+  CaretDown, Check, Coffee, DotsThree, Gear, Gift, Heart,
   House, MagnifyingGlass, PencilSimple, Plus, Receipt, ShoppingCart,
   Palette, ShieldCheck, SignOut, Trash, TrendDown, TrendUp, UserCircle, Wallet, X,
 } from '@phosphor-icons/react'
@@ -186,8 +186,8 @@ function Summary({ transactions, goals, totals, setView, openModal }) {
           <span className="orbit orbit-one" /><span className="orbit orbit-two" /><span className="orbit orbit-three" />
           <span className="leaf leaf-one" /><span className="leaf leaf-two" />
         </div> : <div className="chart-column">
-          <div className="chart-head"><span><ChartDonut size={20} />Pengeluaran</span><button onClick={() => setView('expense')}>Detail</button></div>
-          <div className="donut" style={{ '--angle': `${Math.min((categories[0][1] / totals.expense) * 360, 360)}deg` }}><span>{categories.length}</span></div><div className="legend">{categories.map(([name, value]) => <div key={name}><span>{name}</span><strong>{rupiah.format(value)}</strong></div>)}</div>
+          <div className="chart-head"><span>Pengeluaran</span><button onClick={() => setView('expense')}>Detail</button></div>
+          <div className="donut" aria-hidden="true" style={{ '--angle': `${Math.min((categories[0][1] / totals.expense) * 360, 360)}deg` }} /><div className="legend">{categories.map(([name, value]) => <div key={name}><span>{name}</span><strong>{rupiah.format(value)}</strong></div>)}</div>
         </div>}
       </section>
       <div className="quick-actions">
