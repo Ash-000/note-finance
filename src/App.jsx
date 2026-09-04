@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowDown, ArrowRight, ArrowUp, Bank, Bell, BookOpen, Briefcase, CalendarBlank, Camera,
+  ArrowDown, ArrowRight, ArrowUp, Bank, BookOpen, Briefcase, CalendarBlank, Camera,
   CaretDown, Check, Coffee, DotsThree, Gear, Gift, Heart,
-  House, MagnifyingGlass, PencilSimple, Plus, Receipt, ShoppingCart,
-  Palette, ShieldCheck, SignOut, Trash, TrendDown, TrendUp, UserCircle, Wallet, X,
+  House, MagnifyingGlass, Moon, PencilSimple, Plus, Receipt, ShoppingCart,
+  ShieldCheck, SignOut, Sun, Trash, TrendDown, TrendUp, UserCircle, Wallet, X,
 } from '@phosphor-icons/react'
-import { amountSizeClass, buildDonutStops, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount, normalizeTheme } from './validation'
+import { amountSizeClass, buildDonutStops, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount } from './validation'
 
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
 const dateLabel = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -57,20 +57,13 @@ export default function App() {
   const [view, setView] = useState('summary')
   const [modal, setModal] = useState(null)
   const [toast, setToast] = useState('')
-  const [theme, setTheme] = useStoredState('arta-theme', 'deep-ocean')
-  const activeTheme = normalizeTheme(theme)
+  const [theme, setTheme] = useStoredState('note-theme', () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
 
   useEffect(() => {
-    document.documentElement.dataset.theme = activeTheme
-    document.documentElement.style.removeProperty('--custom-bg')
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', activeTheme === 'cool-grey' ? '#37474F' : '#0D47A1')
-    localStorage.removeItem('arta-background')
-    if (theme !== activeTheme) setTheme(activeTheme)
-  }, [activeTheme, setTheme, theme])
-  useEffect(() => {
-    localStorage.removeItem('arta-transactions')
-    localStorage.removeItem('arta-goals')
-  }, [])
+    document.documentElement.dataset.theme = theme
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#111219' : '#A576DE')
+  }, [theme])
+
   useEffect(() => {
     if (!toast) return
     const timer = setTimeout(() => setToast(''), 2800)
@@ -78,9 +71,8 @@ export default function App() {
   }, [toast])
 
   const totals = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'income').reduce((sum, item) => sum + item.amount, 0)
-    const expense = transactions.filter(t => t.type === 'expense').reduce((sum, item) => sum + item.amount, 0)
-    return { income, expense, balance: income - expense }
+    const res = transactions.reduce((acc, t) => { acc[t.type] += t.amount; return acc }, { income: 0, expense: 0 })
+    return { ...res, balance: res.income - res.expense }
   }, [transactions])
 
   const saveTransaction = data => {
@@ -123,7 +115,7 @@ export default function App() {
       ? <TransactionsPage type={view} transactions={transactions} openModal={setModal} onDelete={deleteTransaction} />
       : view === 'wishlist'
         ? <WishlistPage goals={goals} openModal={setModal} onDelete={deleteGoal} />
-        : <SettingsPage theme={activeTheme} setTheme={setTheme} onLogout={() => setSession(null)} onClear={() => { if (window.confirm('Hapus seluruh transaksi dan wishlist?')) { setTransactions([]); setGoals([]); setToast('Semua data keuangan dihapus') } }} />
+        : <SettingsPage onLogout={() => setSession(null)} onClear={() => { if (window.confirm('Hapus seluruh transaksi dan wishlist?')) { setTransactions([]); setGoals([]); setToast('Semua data keuangan dihapus') } }} />
 
   return (
     <div className="app-shell">
@@ -152,13 +144,12 @@ export default function App() {
           <button className="mobile-brand" onClick={() => setView('summary')} aria-label="FinNote, ke ringkasan"><BrandMark /><span><strong>FinNote</strong><small>Catatan keuangan</small></span></button>
           <div className="topbar-copy"><p className="eyebrow">{monthLabel.format(new Date())}</p><h1>{view === 'summary' ? `Selamat datang, ${firstName}` : title}</h1></div>
           <div className="header-actions">
-            <button className="icon-button" onClick={() => setTheme(activeTheme === 'deep-ocean' ? 'cool-grey' : 'deep-ocean')} aria-label={`Ganti ke tema ${activeTheme === 'deep-ocean' ? 'Cool Grey' : 'Deep Ocean'}`} title={`Tema ${activeTheme === 'deep-ocean' ? 'Deep Ocean' : 'Cool Grey'}`}><Palette size={20} /></button>
-            <button className="icon-button notification" aria-label="Notifikasi"><Bell size={20} /></button>
+            <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}>{theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}</button>
             <button className="primary header-cta" onClick={() => setModal({ kind: 'transaction', type: view === 'expense' ? 'expense' : 'income' })}>Catat transaksi<span className="button-orb"><Plus size={17} weight="bold" /></span></button>
           </div>
         </header>
 
-        <AnimatedPage key={view}>{page}</AnimatedPage>
+        <div key={view} className="t-panel-slide view-transition">{page}</div>
       </main>
 
       <nav className="mobile-nav" aria-label="Navigasi mobile">
@@ -225,7 +216,7 @@ function TransactionsPage({ type, transactions, openModal, onDelete }) {
   const total = periodTransactions.reduce((sum, item) => sum + item.amount, 0)
   const activePeriod = periodOptions.find(item => item.value === period)?.label.toLowerCase()
   return <div className="page-stack">
-    <section className={`total-banner ${type}`}><div><p>Total {type === 'income' ? 'pemasukan' : 'pengeluaran'} · {activePeriod}</p><strong className={amountSizeClass(total)}>{rupiah.format(total)}</strong><small>{periodTransactions.length} transaksi tercatat</small></div><span>{type === 'income' ? <TrendUp size={34} /> : <TrendDown size={34} />}</span></section>
+    <section className={`total-banner ${type}`}><div><p>Total {type === 'income' ? 'pemasukan' : 'pengeluaran'} · {activePeriod}</p><strong className={amountSizeClass(total)}>{rupiah.format(total)}</strong><small>{periodTransactions.length} transaksi tercatat</small></div><span>{type === 'income' ? <TrendUp size={34} weight="bold" /> : <TrendDown size={34} weight="bold" />}</span></section>
     <section className="panel table-panel"><div className="list-toolbar"><div className="search"><MagnifyingGlass size={19} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Cari transaksi..." aria-label="Cari transaksi" /></div><div className="select-wrap period-filter"><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Filter periode">{periodOptions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select><CaretDown size={16} /></div><div className="select-wrap category-filter"><select value={category} onChange={event => setCategory(event.target.value)} aria-label="Filter kategori"><option>Semua kategori</option>{categories.map(item => <option key={item}>{item}</option>)}</select><CaretDown size={16} /></div><button className="primary" onClick={() => openModal({ kind: 'transaction', type })}><Plus size={18} />Tambah</button></div>
       {filtered.length ? <div className="transaction-list detailed">{filtered.map(item => <TransactionRow key={item.id} item={item} actions onEdit={() => openModal({ kind: 'transaction', item, type })} onDelete={() => onDelete(item.id)} />)}</div> : <EmptyState icon={MagnifyingGlass} title="Tidak ada transaksi" text={query || category !== 'Semua kategori' ? 'Coba kata kunci atau filter yang berbeda.' : `Belum ada transaksi untuk ${activePeriod}.`} />}
     </section>
@@ -240,27 +231,19 @@ function WishlistPage({ goals, openModal, onDelete }) {
   </div>
 }
 
-function SettingsPage({ theme, setTheme, onLogout, onClear }) {
-  const themeCopy = theme === 'cool-grey'
-    ? { name: 'Cool Grey', text: 'Teknologi, inovatif, dan bersih.' }
-    : { name: 'Deep Ocean', text: 'Terpercaya, stabil, dan profesional.' }
+function SettingsPage({ onLogout, onClear }) {
   return <div className="settings-grid">
     <div className="settings-content">
     <section className="panel settings-section">
-      <div className="settings-icon"><Palette size={24} weight="duotone" /></div>
-      <div><h2>Tampilan</h2><p>Sesuaikan aplikasi agar lebih nyaman dilihat.</p></div>
-      <div className="setting-row theme-setting"><div><strong>Tema warna</strong><span>Dua palet minimal untuk seluruh aplikasi.</span></div><div className="palette-options" role="radiogroup" aria-label="Tema warna"><button className={`palette-option deep-ocean-option ${theme === 'deep-ocean' ? 'active' : ''}`} onClick={() => setTheme('deep-ocean')} role="radio" aria-checked={theme === 'deep-ocean'}><span className="palette-swatches" aria-hidden="true"><i /><i /><i /></span><span><strong>Deep Ocean</strong><small>Stabil & profesional</small></span>{theme === 'deep-ocean' && <Check size={18} weight="bold" />}</button><button className={`palette-option cool-grey-option ${theme === 'cool-grey' ? 'active' : ''}`} onClick={() => setTheme('cool-grey')} role="radio" aria-checked={theme === 'cool-grey'}><span className="palette-swatches" aria-hidden="true"><i /><i /><i /></span><span><strong>Cool Grey</strong><small>Bersih & inovatif</small></span>{theme === 'cool-grey' && <Check size={18} weight="bold" />}</button></div></div>
-    </section>
-    <section className="panel settings-section">
-      <div className="settings-icon"><ShieldCheck size={24} weight="duotone" /></div>
+      <div className="settings-icon"><ShieldCheck size={26} weight="bold" /></div>
       <div><h2>Data dan sesi</h2><p>Kontrol data yang tersimpan pada browser ini.</p></div>
       <div className="setting-row"><div><strong>Hapus data keuangan</strong><span>Menghapus semua transaksi dan wishlist.</span></div><button className="danger-button" onClick={onClear}><Trash size={18} />Hapus data</button></div>
       <div className="setting-row"><div><strong>Keluar dari FinNote</strong><span>Data keuangan tetap tersimpan setelah keluar.</span></div><button className="secondary" onClick={onLogout}><SignOut size={18} />Keluar</button></div>
     </section>
     </div>
-    <aside className="settings-preview" aria-label={`Preview tema ${themeCopy.name}`}>
+    <aside className="settings-preview" aria-label="Preview tema">
       <div className="preview-glow" /><div className="preview-brand"><BrandMark />FinNote</div>
-      <div className="preview-copy"><span>TEMA AKTIF</span><strong>{themeCopy.name}</strong><p>{themeCopy.text} Diterapkan langsung ke seluruh ruang kerja.</p></div>
+      <div className="preview-copy"><span>TEMA AKTIF</span><strong>Aurora</strong><p>Palet cyan-biru-ungu yang mengikuti mode terang/gelap sistem.</p></div>
       <div className="preview-window"><div className="preview-window-head"><i /><i /><i /></div><div className="preview-window-body"><span /><span /><span /></div></div>
     </aside>
   </div>
@@ -268,27 +251,19 @@ function SettingsPage({ theme, setTheme, onLogout, onClear }) {
 
 function LoginScreen({ onLogin }) {
   const [name, setName] = useState('')
-  const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const submit = event => {
     event.preventDefault()
-    if (!isValidLogin(name, pin)) return setError('Masukkan nama dan PIN 4 digit yang valid.')
+    if (!isValidLogin(name)) return setError('Masukkan nama yang valid.')
     onLogin({ name: name.trim() })
   }
   return <main className="login-page">
     <section className="login-copy t-stagger is-shown"><button className="brand login-brand" type="button"><BrandMark /><span>FinNote</span></button><div className="login-rings" aria-hidden="true"><span /><span /><span /><span /></div><div><p className="login-kicker t-stagger-line t-stagger-line--1">Keuangan pribadi</p><h1 className="t-stagger-line t-stagger-line--2">Uang lebih tertata.<br />Hidup lebih tenang.</h1><p className="login-description t-stagger-line t-stagger-line--3">Catat pemasukan, pengeluaran, dan target tanpa spreadsheet.</p></div><div className="login-foot"><ShieldCheck size={18} />Data tersimpan di browser perangkat ini</div></section>
-    <section className="login-form-wrap"><form className="login-card" onSubmit={submit}><div className="login-avatar"><UserCircle size={34} weight="duotone" /></div><h2>Selamat datang</h2><p>Masuk untuk membuka catatan keuanganmu.</p><Field label="Nama"><input autoFocus autoComplete="name" value={name} onChange={event => setName(event.target.value)} placeholder="Nama kamu" /></Field><Field label="PIN"><input type="password" inputMode="numeric" autoComplete="current-password" maxLength="4" value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, ''))} placeholder="4 digit PIN" /></Field>{error && <p className="form-error login-error" role="alert">{error}</p>}<button className="primary login-submit">Masuk ke FinNote <span className="button-orb"><ArrowRight size={17} /></span></button><small>Login lokal. Tidak ada data yang dikirim ke server.</small></form></section>
+    <section className="login-form-wrap"><form className="login-card" onSubmit={submit}><div className="login-avatar"><UserCircle size={34} weight="duotone" /></div><h2>Selamat datang</h2><p>Masuk untuk membuka catatan keuanganmu.</p><Field label="Nama"><input autoFocus autoComplete="name" value={name} onChange={event => setName(event.target.value)} placeholder="Nama kamu" /></Field>{error && <p className="form-error login-error" role="alert">{error}</p>}<button className="primary login-submit">Masuk ke FinNote <span className="button-orb"><ArrowRight size={17} /></span></button><small>Login lokal. Tidak ada data yang dikirim ke server.</small></form></section>
   </main>
 }
 
-function AnimatedPage({ children }) {
-  const [open, setOpen] = useState(false)
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setOpen(true))
-    return () => cancelAnimationFrame(frame)
-  }, [])
-  return <div className="t-panel-slide view-transition" data-open={open}>{children}</div>
-}
+
 
 function PanelHeader({ title, action, onClick }) { return <div className="panel-head"><h2>{title}</h2><button onClick={onClick}>{action}</button></div> }
 
@@ -303,8 +278,7 @@ function GoalCard({ goal, compact, onSaving, onEdit, onDelete }) {
 }
 
 function ModalShell({ title, subtitle, onClose, children }) {
-  useEffect(() => { const closeOnEscape = event => event.key === 'Escape' && onClose(); window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape) }, [onClose])
-  return <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-head"><div><h2 id="modal-title">{title}</h2><p>{subtitle}</p></div><button className="icon-button" onClick={onClose} aria-label="Tutup"><X size={20} /></button></div>{children}</div></div>
+  return <dialog ref={el => el && !el.open && el.showModal()} className="modal-backdrop" style={{ margin: 0, padding: 0, border: 'none', maxWidth: 'none', maxHeight: 'none', background: 'transparent' }} onClick={event => event.target === event.currentTarget && onClose()} onClose={onClose}><div className="modal" aria-labelledby="modal-title"><div className="modal-head"><div><h2 id="modal-title">{title}</h2><p>{subtitle}</p></div><button type="button" className="icon-button" onClick={onClose} aria-label="Tutup"><X size={20} /></button></div>{children}</div></dialog>
 }
 
 function TransactionModal({ initial, defaultType, onClose, onSave }) {
@@ -332,5 +306,5 @@ function SavingModal({ goal, onClose, onSave }) {
 
 function Field({ label, children }) { return <label className="field"><span>{label}</span>{children}</label> }
 function MoneyInput({ value, onChange, autoFocus = false }) { return <div className="money-input"><span>Rp</span><input autoFocus={autoFocus} type="text" inputMode="numeric" autoComplete="off" value={formatAmountInput(value)} onChange={event => onChange(normalizeAmount(event.target.value))} placeholder="0" aria-label="Nominal dalam rupiah" /></div> }
-function EmptyCompact({ text }) { return <div className="empty-compact"><Receipt size={28} /><span>{text}</span></div> }
+
 function EmptyState({ icon: Icon, title, text, action, onAction }) { return <div className="empty-state"><span><Icon size={30} /></span><h3>{title}</h3><p>{text}</p>{action && <button className="primary" onClick={onAction}>{action}</button>}</div> }

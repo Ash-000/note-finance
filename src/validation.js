@@ -1,10 +1,9 @@
-export const isValidLogin = (name, pin) => name.trim().length >= 2 && /^\d{4}$/.test(pin)
+export const isValidLogin = name => name.trim().length >= 2
 
 export const normalizeAmount = value => String(value ?? '').replace(/\D/g, '').replace(/^0+(?=\d)/, '')
 
 export const formatAmountInput = value => normalizeAmount(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
-export const normalizeTheme = value => value === 'cool-grey' ? 'cool-grey' : 'deep-ocean'
 
 export const buildDonutStops = (values, total) => {
   if (!total) return ''
