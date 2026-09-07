@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { amountSizeClass, buildDonutStops, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount } from '../src/validation.js'
+import { amountSizeClass, buildDonutStops, calculateBudgetStatus, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount } from '../src/validation.js'
 
 assert.equal(isValidLogin('Raka'), true)
 assert.equal(isValidLogin('R'), false)
@@ -23,4 +23,11 @@ assert.equal(isDateInPeriod('2026-01-01', 'year', referenceDate), true)
 assert.equal(isDateInPeriod('2025-12-31', 'year', referenceDate), false)
 assert.equal(isDateInPeriod('2025-12-31', 'all', referenceDate), true)
 
+// Budget calculation assertions
+assert.deepEqual(calculateBudgetStatus(0, 0), { percent: 0, remaining: 0, isExceeded: false, isWarning: false, status: 'none' })
+assert.deepEqual(calculateBudgetStatus(500000, 2000000), { percent: 25, remaining: 1500000, isExceeded: false, isWarning: false, status: 'safe' })
+assert.deepEqual(calculateBudgetStatus(1700000, 2000000), { percent: 85, remaining: 300000, isExceeded: false, isWarning: true, status: 'warning' })
+assert.deepEqual(calculateBudgetStatus(2100000, 2000000), { percent: 105, remaining: -100000, isExceeded: true, isWarning: false, status: 'exceeded' })
+
 console.log('Self-check passed')
+

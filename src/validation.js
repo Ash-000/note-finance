@@ -36,3 +36,16 @@ export const amountSizeClass = value => {
   const length = normalizeAmount(Math.abs(Number(value) || 0)).length
   return length >= 13 ? 'amount-long' : length >= 10 ? 'amount-medium' : ''
 }
+
+export const calculateBudgetStatus = (spent, limit) => {
+  const safeLimit = Number(limit) || 0
+  const safeSpent = Number(spent) || 0
+  if (safeLimit <= 0) return { percent: 0, remaining: 0, isExceeded: false, isWarning: false, status: 'none' }
+  const percent = Math.round((safeSpent / safeLimit) * 100)
+  const remaining = safeLimit - safeSpent
+  const isExceeded = safeSpent >= safeLimit
+  const isWarning = !isExceeded && percent >= 80
+  const status = isExceeded ? 'exceeded' : isWarning ? 'warning' : 'safe'
+  return { percent, remaining, isExceeded, isWarning, status }
+}
+
