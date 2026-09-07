@@ -1,0 +1,74 @@
+{
+  "package.json": {
+    "mtime": 1788410473.6235263,
+    "seen": 1788757514.9787188,
+    "ast_hash": "18102dea548b7f1156ef1ba70e0dbe87",
+    "semantic_hash": "18102dea548b7f1156ef1ba70e0dbe87"
+  },
+  "scripts/self-check.mjs": {
+    "mtime": 1788750516.813948,
+    "seen": 1788757514.9787188,
+    "ast_hash": "79d5aeec10f3afcf81ea0721f2080bfd",
+    "semantic_hash": "79d5aeec10f3afcf81ea0721f2080bfd"
+  },
+  "src/App.jsx": {
+    "mtime": 1788754786.249982,
+    "seen": 1788757514.9787188,
+    "ast_hash": "e478c8d135c16497d6f44dbe52dbbb42",
+    "semantic_hash": "e478c8d135c16497d6f44dbe52dbbb42"
+  },
+  "src/main.jsx": {
+    "mtime": 1788336656.814539,
+    "seen": 1788757514.9787188,
+    "ast_hash": "a54487d7f075eca557d1e3107b03c21f",
+    "semantic_hash": "a54487d7f075eca557d1e3107b03c21f"
+  },
+  "src/validation.js": {
+    "mtime": 1788750504.022789,
+    "seen": 1788757514.9787188,
+    "ast_hash": "d7cadec5fd47c2dfcda25a68c2322393",
+    "semantic_hash": "d7cadec5fd47c2dfcda25a68c2322393"
+  },
+  "vercel.json": {
+    "mtime": 1788336158.0169964,
+    "seen": 1788757514.9787188,
+    "ast_hash": "3ce034f37a6661efc8073a99b87d2c87",
+    "semantic_hash": "3ce034f37a6661efc8073a99b87d2c87"
+  },
+  "vite.config.js": {
+    "mtime": 1788336156.8056054,
+    "seen": 1788757514.9787188,
+    "ast_hash": "35b0df2c24b7c022082f2ee325a3129e",
+    "semantic_hash": "35b0df2c24b7c022082f2ee325a3129e"
+  },
+  "README.md": {
+    "mtime": 1788410472.5149796,
+    "seen": 1788757514.9787188,
+    "ast_hash": "a315246bb2d30877819ec43acb138d73",
+    "semantic_hash": "a315246bb2d30877819ec43acb138d73"
+  },
+  "design-plans/consolidate-theme-styles.md": {
+    "mtime": 1788409770.9965384,
+    "seen": 1788757514.9787188,
+    "ast_hash": "f8fb367c674ad2729175e906fc23ee41",
+    "semantic_hash": "f8fb367c674ad2729175e906fc23ee41"
+  },
+  "design-plans/tighten-theme-copy.md": {
+    "mtime": 1788409772.0165296,
+    "seen": 1788757514.9787188,
+    "ast_hash": "4f647b05e94a5ee3908ceea009f9b5cc",
+    "semantic_hash": "4f647b05e94a5ee3908ceea009f9b5cc"
+  },
+  "index.html": {
+    "mtime": 1788749539.43949,
+    "seen": 1788757514.9787188,
+    "ast_hash": "f7a3b956ca3831b182f4983b604c16d5",
+    "semantic_hash": "f7a3b956ca3831b182f4983b604c16d5"
+  },
+  "public/finnote-logo.png": {
+    "mtime": 1788421690.9781852,
+    "seen": 1788757514.9787188,
+    "ast_hash": "90c5246a0b8e075d92b10399dc3051f2",
+    "semantic_hash": "90c5246a0b8e075d92b10399dc3051f2"
+  }
+}
