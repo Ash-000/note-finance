@@ -93,6 +93,14 @@ async function setupBot() {
   if (me && me.ok) {
     botUsername = me.result.username
     console.log(`[FinNote Bot] Berhasil terhubung sebagai @${botUsername}`)
+    await callTelegram('setMyCommands', {
+      commands: [
+        { command: 'saldo', description: 'Cek saldo dan total pengeluaran' },
+        { command: 'rekap', description: 'Lihat rekap transaksi hari ini' },
+        { command: 'reset', description: 'Reset seluruh data transaksi' },
+        { command: 'help', description: 'Panduan cara penggunaan bot' }
+      ]
+    })
     startPolling()
   } else {
     console.error('[FinNote Bot] Gagal verifikasi Bot Token:', me?.description || 'Unknown error')
@@ -120,6 +128,8 @@ async function startPolling() {
             await handleTelegramMessage(update.message)
           }
         }
+      } else {
+        await new Promise(r => setTimeout(r, 3000))
       }
     } catch (err) {
       console.error('[FinNote Polling Error]:', err.message)
@@ -147,6 +157,7 @@ async function handleTelegramMessage(message) {
       `<b>📊 Perintah:</b>\n` +
       `• /saldo - Cek ringkasan saldo & pengeluaran\n` +
       `• /rekap - Lihat transaksi hari ini\n` +
+      `• /reset - Reset seluruh data transaksi\n` +
       `• /help - Bantuan format chat`
 
     const replyMarkup = WEBAPP_URL ? {
@@ -206,6 +217,27 @@ async function handleTelegramMessage(message) {
       `${listStr}\n\n` +
       `📉 Total Keluar: <b>${rupiahFormat(todayExpense)}</b>\n` +
       (todayIncome > 0 ? `📈 Total Masuk: <b>${rupiahFormat(todayIncome)}</b>\n` : '')
+
+    await sendTelegramMessage(chatId, reply)
+    return
+  }
+
+  const cleanCmd = text.trim().toLowerCase()
+  if (cleanCmd === '/reset' || cleanCmd.startsWith('/reset ') || cleanCmd === 'reset') {
+    const totalCount = db.transactions.length
+    if (totalCount === 0) {
+      await sendTelegramMessage(chatId, `ℹ️ <b>Data transaksi sudah kosong.</b>\nTidak ada transaksi yang perlu direset.`)
+      return
+    }
+
+    db.transactions = []
+    db.lastReset = new Date().toISOString()
+    await writeDb(db)
+
+    const reply = `🗑️ <b>Semua Data Transaksi Berhasil Direset!</b>\n\n` +
+      `Sebanyak <b>${totalCount} transaksi</b> telah dihapus dari FinNote.\n` +
+      `Saldo dan riwayat pencatatan kini kembali ke Rp 0.\n\n` +
+      `💡 <i>Kamu bisa langsung mulai mencatat transaksi baru, contoh: <code>kopi 25k</code> atau <code>gaji 5jt</code>.</i>`
 
     await sendTelegramMessage(chatId, reply)
     return
@@ -292,12 +324,21 @@ const server = http.createServer(async (req, res) => {
       botActive: Boolean(botUsername),
       botUsername: botUsername || null,
       transactionsCount: db.transactions.length,
-      hasToken: Boolean(BOT_TOKEN)
+      hasToken: Boolean(BOT_TOKEN),
+      lastReset: db.lastReset || null
     })
   }
 
   if (url.pathname === '/api/transactions' && req.method === 'GET') {
     return sendJson(200, db.transactions)
+  }
+
+  if (url.pathname === '/api/reset' && req.method === 'POST') {
+    const totalCount = db.transactions.length
+    db.transactions = []
+    db.lastReset = new Date().toISOString()
+    await writeDb(db)
+    return sendJson(200, { ok: true, deletedCount: totalCount, transactions: [], lastReset: db.lastReset })
   }
 
   if (url.pathname === '/api/transactions' && req.method === 'POST') {
@@ -309,7 +350,7 @@ const server = http.createServer(async (req, res) => {
       ...body,
       id: body.id || 'web_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       date: body.date || new Date().toISOString().slice(0, 10),
-      createdAt: new Date().toISOString()
+      createdAt: body.createdAt || new Date().toISOString()
     }
     db.transactions.unshift(tx)
     await writeDb(db)
@@ -324,17 +365,25 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/sync' && req.method === 'POST') {
-    const { transactions: clientTxs = [] } = await getBody()
+    const { transactions: clientTxs = [], lastReset: clientReset } = await getBody()
+    
+    // Abaikan data lama client jika server telah direset lebih baru daripada client
+    const isClientBehindReset = Boolean(db.lastReset && (!clientReset || clientReset < db.lastReset))
+
     const map = new Map()
     // Server items first
     for (const t of db.transactions) map.set(t.id, t)
-    // Merge client items if not exists
-    for (const t of clientTxs) {
-      if (!map.has(t.id)) map.set(t.id, t)
+    
+    // Merge client items jika tidak terhalang reset
+    if (!isClientBehindReset) {
+      for (const t of clientTxs) {
+        if (!map.has(t.id)) map.set(t.id, t)
+      }
     }
+    
     db.transactions = Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
     await writeDb(db)
-    return sendJson(200, { ok: true, transactions: db.transactions })
+    return sendJson(200, { ok: true, transactions: db.transactions, lastReset: db.lastReset || null })
   }
 
   sendJson(404, { error: 'Not Found' })

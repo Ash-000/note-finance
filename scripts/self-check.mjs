@@ -74,6 +74,8 @@ assert.equal(msgBonus?.category, 'Bonus')
 assert.equal(msgBonus?.type, 'income')
 
 assert.equal(parseTelegramMessage('/start'), null)
+assert.equal(parseTelegramMessage('/rekap'), null)
+assert.equal(parseTelegramMessage('/reset'), null)
 assert.equal(parseTelegramMessage('hanya teks tanpa nominal'), null)
 assert.equal(parseTelegramMessage(''), null)
 

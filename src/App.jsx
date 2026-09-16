@@ -51,6 +51,7 @@ function BrandMark() {
 
 export default function App() {
   const [transactions, setTransactions] = useStoredState('arta-transactions-v2', [])
+  const [lastReset, setLastReset] = useStoredState('arta-last-reset', null)
   const [goals, setGoals] = useStoredState('arta-goals-v2', [])
   const [monthlyBudget, setMonthlyBudget] = useStoredState('note-monthly-budget-v1', { limit: 0, active: false, extraFromSavings: 0, month: today.slice(0, 7) })
   const [savingsReserve, setSavingsReserve] = useStoredState('note-savings-reserve-v1', 0)
@@ -94,12 +95,15 @@ export default function App() {
       const syncRes = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactions })
+        body: JSON.stringify({ transactions, lastReset })
       }).catch(() => null)
 
       if (syncRes && syncRes.ok) {
         const data = await syncRes.json()
-        if (Array.isArray(data.transactions) && data.transactions.length !== transactions.length) {
+        if (data.lastReset && data.lastReset !== lastReset) {
+          setLastReset(data.lastReset)
+          setTransactions(data.transactions || [])
+        } else if (Array.isArray(data.transactions) && data.transactions.length !== transactions.length) {
           setTransactions(data.transactions)
         }
         if (!silent) setToast('Data berhasil disinkronkan!')
@@ -259,11 +263,16 @@ export default function App() {
             onLogout={() => setSession(null)}
             onClear={() => {
               if (window.confirm('Hapus seluruh data keuangan (transaksi, wishlist, limit, dan simpanan)?')) {
+                const nowReset = new Date().toISOString()
+                setLastReset(nowReset)
                 setTransactions([])
                 setGoals([])
                 setMonthlyBudget({ limit: 0, active: false, extraFromSavings: 0, month: today.slice(0, 7) })
                 setSavingsReserve(0)
                 setToast('Semua data keuangan dihapus')
+                if (botStatus.connected) {
+                  fetch('/api/reset', { method: 'POST' }).catch(() => {})
+                }
               }
             }}
             monthlyBudget={monthlyBudget}
@@ -896,7 +905,7 @@ function SettingsPage({ onLogout, onClear, monthlyBudget, savingsReserve, openMo
               <span className="step-num">3</span>
               <div>
                 <strong>Ketik Chat untuk Mencatat</strong>
-                <p>Chat bot Telegram dengan format santai: <code>kopi 25k</code>, <code>bensin 50rb</code>, <code>makan siang 35.000</code>, <code>gaji 5jt</code>, atau <code>/saldo</code>.</p>
+                <p>Chat bot Telegram dengan format santai: <code>kopi 25k</code>, <code>bensin 50rb</code>, <code>/saldo</code>, <code>/rekap</code>, atau <code>/reset</code>.</p>
               </div>
             </div>
           </div>
