@@ -87,7 +87,7 @@ export const parseTelegramMessage = (text = '', todayStr = new Date().toISOStrin
   const amount = Math.round(baseNum * multiplier)
   if (!amount || Number.isNaN(amount) || amount <= 0) return null
 
-  let title = workText.replace(match[0], '').replace(/\s+/g, ' ').trim()
+  let title = workText.replace(match[0], '').replace(/\s+/g, ' ').replace(/[,\-–—\s]+$/, '').trim()
   if (!title) {
     title = explicitType === 'income' ? 'Pemasukan' : 'Pengeluaran'
   }

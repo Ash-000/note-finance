@@ -48,9 +48,22 @@ async function writeDb(data) {
 
 const db = await initDb()
 
-// Helper format rupiah
+// Helper format rupiah & text escaping
 const rupiahFormat = num => {
   return 'Rp ' + Number(num || 0).toLocaleString('id-ID')
+}
+
+const escapeHtml = (str = '') => {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+const getLocalDateStr = () => {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
 
 // Telegram API Helper
@@ -63,7 +76,11 @@ async function callTelegram(method, body) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     })
-    return await res.json()
+    const data = await res.json()
+    if (!data.ok) {
+      console.error(`[Telegram API Error] ${method}:`, data.description || data)
+    }
+    return data
   } catch (err) {
     console.error(`[Telegram Error] ${method}:`, err.message)
     return null
@@ -71,12 +88,22 @@ async function callTelegram(method, body) {
 }
 
 async function sendTelegramMessage(chatId, text, extra = {}) {
-  return callTelegram('sendMessage', {
+  const res = await callTelegram('sendMessage', {
     chat_id: chatId,
     text,
     parse_mode: 'HTML',
     ...extra
   })
+  if (!res || !res.ok) {
+    // Fallback: kirim pesan teks biasa jika parsing HTML gagal
+    const plainText = text.replace(/<[^>]*>/g, '')
+    return callTelegram('sendMessage', {
+      chat_id: chatId,
+      text: plainText,
+      ...extra
+    })
+  }
+  return res
 }
 
 // Bot logic
@@ -125,7 +152,11 @@ async function startPolling() {
         for (const update of res.result) {
           lastUpdateId = update.update_id
           if (update.message && update.message.text) {
-            await handleTelegramMessage(update.message)
+            try {
+              await handleTelegramMessage(update.message)
+            } catch (msgErr) {
+              console.error('[FinNote Message Processing Error]:', msgErr)
+            }
           }
         }
       } else {
@@ -139,13 +170,19 @@ async function startPolling() {
 }
 
 async function handleTelegramMessage(message) {
-  const chatId = message.chat.id
-  const text = message.text.trim()
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const chatId = message.chat?.id
+  if (!chatId) return
+  const text = (message.text || '').trim()
+  if (!text) return
+  const todayStr = getLocalDateStr()
+
+  const lowerText = text.toLowerCase()
+  const cleanCmd = lowerText.replace(/@\w+bot\b/gi, '').trim()
 
   // Commands
-  if (text.startsWith('/start') || text.startsWith('/help') || text.toLowerCase() === 'bantuan') {
-    const welcome = `👋 <b>Halo ${message.from.first_name || 'teman'}!</b>\n\n` +
+  if (cleanCmd.startsWith('/start') || cleanCmd.startsWith('/help') || cleanCmd === 'bantuan') {
+    const firstName = escapeHtml(message.from?.first_name || 'teman')
+    const welcome = `👋 <b>Halo ${firstName}!</b>\n\n` +
       `Selamat datang di <b>FinNote Bot</b>. Catat keuangan harianmu langsung dari Telegram.\n\n` +
       `<b>💡 Cara Mencatat Cepat:</b>\n` +
       `• <code>Kopi 25k</code> (Pengeluaran Makan)\n` +
@@ -172,7 +209,7 @@ async function handleTelegramMessage(message) {
     return
   }
 
-  if (text === '/saldo' || text.toLowerCase() === 'saldo') {
+  if (cleanCmd === '/saldo' || cleanCmd === 'saldo') {
     const currentMonth = todayStr.slice(0, 7)
     let income = 0
     let expense = 0
@@ -198,7 +235,7 @@ async function handleTelegramMessage(message) {
     return
   }
 
-  if (text === '/rekap' || text.toLowerCase() === 'rekap') {
+  if (cleanCmd === '/rekap' || cleanCmd === 'rekap') {
     const todayItems = db.transactions.filter(t => t.date === todayStr)
     if (todayItems.length === 0) {
       await sendTelegramMessage(chatId, `🗓️ Belum ada transaksi yang dicatat untuk hari ini (${todayStr}).`)
@@ -210,7 +247,7 @@ async function handleTelegramMessage(message) {
 
     let listStr = todayItems.slice(0, 10).map(t => {
       const sign = t.type === 'income' ? '🟢 +' : '🔴 -'
-      return `${sign} <b>${t.title}</b> (${t.category}): ${rupiahFormat(t.amount)}`
+      return `${sign} <b>${escapeHtml(t.title)}</b> (${escapeHtml(t.category)}): ${rupiahFormat(t.amount)}`
     }).join('\n')
 
     const reply = `🗓️ <b>Rekap Hari Ini (${todayStr})</b>\n\n` +
@@ -222,7 +259,6 @@ async function handleTelegramMessage(message) {
     return
   }
 
-  const cleanCmd = text.trim().toLowerCase()
   if (cleanCmd === '/reset' || cleanCmd.startsWith('/reset ') || cleanCmd === 'reset') {
     const totalCount = db.transactions.length
     if (totalCount === 0) {
@@ -279,8 +315,8 @@ async function handleTelegramMessage(message) {
 
   const confirmation = `✅ <b>Berhasil Dicatat!</b>\n\n` +
     `${icon} <b>${typeLabel}:</b> ${rupiahFormat(newTx.amount)}\n` +
-    `📌 <b>Nama:</b> ${newTx.title}\n` +
-    `🏷️ <b>Kategori:</b> ${newTx.category}\n` +
+    `📌 <b>Nama:</b> ${escapeHtml(newTx.title)}\n` +
+    `🏷️ <b>Kategori:</b> ${escapeHtml(newTx.category)}\n` +
     `📅 <b>Tanggal:</b> ${newTx.date}\n\n` +
     (!isIncome ? `📊 Pengeluaran bulan ini: <b>${rupiahFormat(monthExpense)}</b>` : `💰 Transaksi telah tersimpan ke FinNote.`)
 
@@ -387,6 +423,15 @@ const server = http.createServer(async (req, res) => {
   }
 
   sendJson(404, { error: 'Not Found' })
+})
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[FinNote Server Error] Port ${PORT} sudah digunakan oleh proses lain.`)
+    console.error(`Pastikan tidak ada instance 'npm run bot' atau server lain yang sedang berjalan.`)
+  } else {
+    console.error('[FinNote Server Error]:', err)
+  }
 })
 
 server.listen(PORT, () => {
