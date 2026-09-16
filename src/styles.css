@@ -1859,3 +1859,80 @@ body { background: var(--bg); }
     color: #ffffff !important;
   }
 }
+
+/* Telegram Bot Integration styles */
+.telegram-guide-box {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.guide-title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+.guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.guide-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.guide-step div strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+}
+.guide-step div p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.guide-step code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 11px;
+}
+[data-theme="dark"] .guide-step code {
+  background: rgba(255, 255, 255, 0.1);
+}
+.tma-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 10px;
+}
+@keyframes spin-anim {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin-anim 1s linear infinite;
+}

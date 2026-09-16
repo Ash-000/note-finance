@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "bot": "node bot/server.mjs",
+    "dev:all": "node scripts/dev-all.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "node scripts/self-check.mjs"

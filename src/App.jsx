@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowDown, ArrowRight, ArrowUp, Bank, BookOpen, Briefcase, CalendarBlank, Camera,
+  ArrowClockwise, ArrowDown, ArrowRight, ArrowUp, Bank, BookOpen, Briefcase, CalendarBlank, Camera,
   CaretDown, CaretLeft, CaretRight, Check, Coffee, Coins, DotsThree, Gear, Gift, Heart,
-  House, MagnifyingGlass, Minus, Moon, PencilSimple, Plus, Receipt, ShoppingCart,
+  House, MagnifyingGlass, Minus, Moon, PaperPlaneTilt, PencilSimple, Plus, Receipt, ShoppingCart,
   ShieldCheck, SignOut, SlidersHorizontal, Sun, Trash, TrendDown, TrendUp, UserCircle, Vault, Wallet, Warning, X,
 } from '@phosphor-icons/react'
 import { amountSizeClass, buildDonutStops, calculateBudgetStatus, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount } from './validation'
@@ -59,6 +59,69 @@ export default function App() {
   const [modal, setModal] = useState(null)
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useStoredState('note-theme', () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  const [botStatus, setBotStatus] = useState({ connected: false, botActive: false, botUsername: null, hasToken: false })
+  const [isSyncing, setIsSyncing] = useState(false)
+  const isTelegramMiniApp = typeof window !== 'undefined' && Boolean(window.Telegram?.WebApp?.initData)
+
+  // Initialize Telegram WebApp jika dibuka di dalam Telegram
+  useEffect(() => {
+    if (window.Telegram?.WebApp) {
+      try {
+        window.Telegram.WebApp.ready()
+        window.Telegram.WebApp.expand()
+      } catch {}
+    }
+  }, [])
+
+  // Sinkronisasi data dengan server bot Telegram
+  const syncWithServer = async (silent = true) => {
+    try {
+      if (!silent) setIsSyncing(true)
+      const statusRes = await fetch('/api/status').catch(() => null)
+      if (!statusRes || !statusRes.ok) {
+        setBotStatus(prev => ({ ...prev, connected: false }))
+        if (!silent) setToast('Server bot belum aktif (jalankan "npm run bot")')
+        return
+      }
+      const statusData = await statusRes.json()
+      setBotStatus({
+        connected: true,
+        botActive: statusData.botActive,
+        botUsername: statusData.botUsername,
+        hasToken: statusData.hasToken
+      })
+
+      const syncRes = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions })
+      }).catch(() => null)
+
+      if (syncRes && syncRes.ok) {
+        const data = await syncRes.json()
+        if (Array.isArray(data.transactions) && data.transactions.length !== transactions.length) {
+          setTransactions(data.transactions)
+        }
+        if (!silent) setToast('Data berhasil disinkronkan!')
+      }
+    } catch {
+      if (!silent) setToast('Gagal menyinkronkan data')
+    } finally {
+      if (!silent) setIsSyncing(false)
+    }
+  }
+
+  // Polling sync otomatis
+  useEffect(() => {
+    syncWithServer(true)
+    const onFocus = () => syncWithServer(true)
+    window.addEventListener('focus', onFocus)
+    const interval = setInterval(() => syncWithServer(true), 15000)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      clearInterval(interval)
+    }
+  }, [transactions])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -98,15 +161,28 @@ export default function App() {
   }, [monthlyExpense, effectiveLimit])
 
   const saveTransaction = data => {
-    if (data.id) setTransactions(items => items.map(item => item.id === data.id ? data : item))
-    else setTransactions(items => [{ ...data, id: crypto.randomUUID() }, ...items])
-    setToast(data.id ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil dicatat')
+    const isEdit = Boolean(data.id)
+    const tx = isEdit ? data : { ...data, id: crypto.randomUUID() }
+    if (isEdit) setTransactions(items => items.map(item => item.id === tx.id ? tx : item))
+    else setTransactions(items => [tx, ...items])
+    setToast(isEdit ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil dicatat')
     setModal(null)
+    if (botStatus.connected) {
+      fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tx)
+      }).catch(() => {})
+    }
   }
+
   const deleteTransaction = id => {
     if (window.confirm('Hapus transaksi ini? Tindakan ini tidak dapat dibatalkan.')) {
       setTransactions(items => items.filter(item => item.id !== id))
       setToast('Transaksi dihapus')
+      if (botStatus.connected) {
+        fetch(`/api/transactions/${id}`, { method: 'DELETE' }).catch(() => {})
+      }
     }
   }
   const saveGoal = data => {
@@ -193,6 +269,9 @@ export default function App() {
             monthlyBudget={monthlyBudget}
             savingsReserve={savingsReserve}
             openModal={setModal}
+            botStatus={botStatus}
+            onSync={() => syncWithServer(false)}
+            isSyncing={isSyncing}
           />
 
   return (
@@ -211,7 +290,10 @@ export default function App() {
         <div className="sidebar-bottom">
           <div className="account-card">
             <UserCircle size={38} weight="fill" />
-            <div><strong>{session.name}</strong><span>Data tersimpan lokal</span></div>
+            <div>
+              <strong>{session.name}</strong>
+              <span>{botStatus.connected && botStatus.botActive ? `Bot @${botStatus.botUsername}` : 'Data tersimpan lokal'}</span>
+            </div>
             <DotsThree size={22} />
           </div>
         </div>
@@ -220,7 +302,13 @@ export default function App() {
       <main>
         <header className="topbar">
           <button className="mobile-brand" onClick={() => setView('summary')} aria-label="FinNote, ke ringkasan"><BrandMark /><span><strong>FinNote</strong><small>Catatan keuangan</small></span></button>
-          <div className="topbar-copy"><p className="eyebrow">{monthLabel.format(new Date())}</p><h1>{view === 'summary' ? `Selamat datang, ${firstName}` : title}</h1></div>
+          <div className="topbar-copy">
+            <p className="eyebrow">
+              {monthLabel.format(new Date())}
+              {isTelegramMiniApp && <span className="tma-badge">📱 Telegram</span>}
+            </p>
+            <h1>{view === 'summary' ? `Selamat datang, ${firstName}` : title}</h1>
+          </div>
           <div className="header-actions">
             <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}>{theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}</button>
             <button className="primary header-cta" onClick={() => setModal({ kind: 'transaction', type: 'expense' })}>Catat transaksi<span className="button-orb"><Plus size={17} weight="bold" /></span></button>
@@ -740,9 +828,81 @@ function WishlistPage({ goals, openModal, onDelete }) {
   </div>
 }
 
-function SettingsPage({ onLogout, onClear, monthlyBudget, savingsReserve, openModal }) {
+function SettingsPage({ onLogout, onClear, monthlyBudget, savingsReserve, openModal, botStatus, onSync, isSyncing }) {
   return <div className="settings-grid">
     <div className="settings-content">
+      <section className="panel settings-section">
+        <div className="settings-icon"><PaperPlaneTilt size={26} weight="bold" /></div>
+        <div>
+          <h2>Integrasi Bot Telegram</h2>
+          <p>Catat transaksi praktis lewat chat Telegram langsung ke FinNote.</p>
+        </div>
+
+        <div className="setting-row">
+          <div>
+            <strong>Status Server & Bot</strong>
+            <span>
+              {botStatus?.connected && botStatus?.botActive
+                ? `🟢 Terhubung aktif sebagai @${botStatus.botUsername}`
+                : botStatus?.connected
+                  ? '🟡 Server aktif • Token bot belum diisi di .env'
+                  : '⚪ Server bot offline • Jalankan "npm run bot" untuk mengaktifkan'}
+            </span>
+          </div>
+          <div className="setting-row-actions">
+            <button
+              className="secondary"
+              type="button"
+              onClick={onSync}
+              disabled={isSyncing}
+              title="Sinkronkan data transaksi antara browser dan bot"
+            >
+              <ArrowClockwise size={18} className={isSyncing ? 'spin' : ''} />
+              <span>{isSyncing ? 'Sinkron...' : 'Sinkronkan'}</span>
+            </button>
+            {botStatus?.botUsername && (
+              <a
+                href={`https://t.me/${botStatus.botUsername}`}
+                target="_blank"
+                rel="noreferrer"
+                className="primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none', padding: '10px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: '600' }}
+              >
+                <PaperPlaneTilt size={16} weight="bold" />
+                <span>Buka Bot</span>
+              </a>
+            )}
+          </div>
+        </div>
+
+        <div className="telegram-guide-box">
+          <p className="guide-title"><strong>💡 Panduan Cepat Menghubungkan Bot:</strong></p>
+          <div className="guide-steps">
+            <div className="guide-step">
+              <span className="step-num">1</span>
+              <div>
+                <strong>Buat Bot & Dapatkan Token</strong>
+                <p>Buka <a href="https://t.me/botfather" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>@BotFather</a> di Telegram, kirim <code>/newbot</code>, lalu salin token bot.</p>
+              </div>
+            </div>
+            <div className="guide-step">
+              <span className="step-num">2</span>
+              <div>
+                <strong>Simpan Token ke File .env</strong>
+                <p>Buka file <code>.env</code> di folder proyek, isi <code>TELEGRAM_BOT_TOKEN=token_kamu</code>, lalu jalankan <code>npm run bot</code>.</p>
+              </div>
+            </div>
+            <div className="guide-step">
+              <span className="step-num">3</span>
+              <div>
+                <strong>Ketik Chat untuk Mencatat</strong>
+                <p>Chat bot Telegram dengan format santai: <code>kopi 25k</code>, <code>bensin 50rb</code>, <code>makan siang 35.000</code>, <code>gaji 5jt</code>, atau <code>/saldo</code>.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="panel settings-section">
         <div className="settings-icon"><SlidersHorizontal size={26} weight="bold" /></div>
         <div><h2>Limit Anggaran & Simpanan</h2><p>Atur batas belanja bulanan dan alokasi dana cadangan.</p></div>
