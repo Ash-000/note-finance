@@ -1075,7 +1075,13 @@ function LoginScreen({ onLogin }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-      const data = await res.json()
+      const rawText = await res.text()
+      let data = {}
+      try {
+        data = JSON.parse(rawText)
+      } catch {
+        throw new Error('Respon server tidak valid atau backend offline. Pastikan server aktif dan konfigurasi database sudah benar.')
+      }
       if (!res.ok) {
         throw new Error(data.error || 'Terjadi kesalahan saat masuk.')
       }
@@ -1086,14 +1092,8 @@ function LoginScreen({ onLogin }) {
         email: data.user.email
       })
     } catch (err) {
-      if (err.message.includes('fetch') || err.message.includes('Failed to fetch')) {
-        // Fallback jika backend offline: izinkan masuk lokal dengan email
-        onLogin({
-          token: null,
-          user: { name: name || email.split('@')[0], email },
-          name: name || email.split('@')[0],
-          email
-        })
+      if (err.message.includes('fetch') || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        setError('Server backend sedang offline. Periksa koneksi internet atau status server backend kamu.')
       } else {
         setError(err.message)
       }
