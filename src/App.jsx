@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowClockwise, ArrowDown, ArrowRight, ArrowUp, Bank, BookOpen, Briefcase, CalendarBlank, Camera,
-  CaretDown, CaretLeft, CaretRight, Check, Coffee, Coins, DotsThree, Gear, Gift, Heart,
-  House, MagnifyingGlass, Minus, Moon, PaperPlaneTilt, PencilSimple, Plus, Receipt, ShoppingCart,
-  ShieldCheck, SignOut, SlidersHorizontal, Sun, Trash, TrendDown, TrendUp, UserCircle, Vault, Wallet, Warning, X,
+  ArrowClockwise, ArrowDown, ArrowRight, ArrowUp, Bank, BookOpen, Briefcase, Camera,
+  CaretDown, CaretLeft, CaretRight, Check, Coffee, Gear, Gift, Heart,
+  House, MagnifyingGlass, Minus, Moon, PencilSimple, Plus, Receipt, ShoppingCart,
+  SignOut, SlidersHorizontal, Sun, Trash, UserCircle, Vault, Wallet, Warning, X,
 } from '@phosphor-icons/react'
-import { amountSizeClass, buildDonutStops, calculateBudgetStatus, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount } from './validation'
+import {
+  amountSizeClass, buildDonutStops, calculateBudgetStatus, evaluateKeypadExpression,
+  formatAmountInput, isDateInPeriod, isOperator, isValidEmail, isValidPassword, normalizeAmount
+} from './validation'
 
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
 const dateLabel = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 const monthLabel = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' })
 const today = new Date().toISOString().slice(0, 10)
 
-const iconFor = (category, size = 20) => {
+const iconFor = (category, size = 18) => {
   const props = { size, weight: 'regular' }
   if (category === 'Gaji' || category === 'Freelance') return <Briefcase {...props} />
   if (category === 'Belanja') return <ShoppingCart {...props} />
@@ -49,13 +52,51 @@ function BrandMark() {
   return <span className="brand-mark"><img className="brand-logo" src="/finnote-logo.png" width="768" height="768" alt="" aria-hidden="true" /></span>
 }
 
+function DoodleSquiggle({ className = '' }) {
+  return (
+    <svg className={`doodle-squiggle ${className}`} viewBox="0 0 120 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M2 6C18 2 34 8 50 5C66 2 82 8 98 4C106 2.5 114 6 118 5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function DoodleSparkle({ size = 14, className = '' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={`doodle-sparkle ${className}`} aria-hidden="true">
+      <path d="M12 2C12.5 7 17 11.5 22 12C17 12.5 12.5 17 12 22C11.5 17 7 12.5 2 12C7 11.5 11.5 7 12 2Z"/>
+    </svg>
+  )
+}
+
+function DoodleReceiptEmpty() {
+  return (
+    <svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="doodle-empty-art" aria-hidden="true">
+      <path d="M10 8C10 6.9 10.9 6 12 6H36C37.1 6 38 6.9 38 8V42L33 39L28 42L24 39L20 42L15 39L10 42V8Z"/>
+      <path d="M18 16H30"/>
+      <path d="M18 22H30"/>
+      <path d="M18 28H24"/>
+      <circle cx="32" cy="28" r="1.5" fill="currentColor"/>
+    </svg>
+  )
+}
+
+function DoodleHeartEmpty() {
+  return (
+    <svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="doodle-empty-art" aria-hidden="true">
+      <path d="M24 38S10 28 10 18A8 8 0 0 1 24 13A8 8 0 0 1 38 18C38 28 24 38 24 38Z"/>
+      <path d="M24 16V22"/>
+      <path d="M21 19H27"/>
+    </svg>
+  )
+}
+
 export default function App() {
   const [transactions, setTransactions] = useStoredState('arta-transactions-v2', [])
   const [lastReset, setLastReset] = useStoredState('arta-last-reset', null)
   const [goals, setGoals] = useStoredState('arta-goals-v2', [])
   const [monthlyBudget, setMonthlyBudget] = useStoredState('note-monthly-budget-v1', { limit: 0, active: false, extraFromSavings: 0, month: today.slice(0, 7) })
   const [savingsReserve, setSavingsReserve] = useStoredState('note-savings-reserve-v1', 0)
-  const [session, setSession] = useStoredState('arta-session', null)
+  const [session, setSession] = useStoredState('arta-session-v3', null)
   const [view, setView] = useState('summary')
   const [modal, setModal] = useState(null)
   const [toast, setToast] = useState('')
@@ -74,14 +115,14 @@ export default function App() {
     }
   }, [])
 
-  // Sinkronisasi data dengan server bot Telegram
+  // Sinkronisasi data dengan server backend PostgreSQL
   const syncWithServer = async (silent = true) => {
     try {
       if (!silent) setIsSyncing(true)
       const statusRes = await fetch('/api/status').catch(() => null)
       if (!statusRes || !statusRes.ok) {
         setBotStatus(prev => ({ ...prev, connected: false }))
-        if (!silent) setToast('Server bot belum aktif (jalankan "npm run bot")')
+        if (!silent) setToast('Server API offline (jalankan "npm run bot")')
         return
       }
       const statusData = await statusRes.json()
@@ -92,22 +133,21 @@ export default function App() {
         hasToken: statusData.hasToken
       })
 
-      const syncRes = await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactions, lastReset })
-      }).catch(() => null)
+      // Jika user terautentikasi, ambil data transaksi miliknya dari PostgreSQL
+      if (session?.token) {
+        const txRes = await fetch('/api/transactions', {
+          headers: { 'Authorization': `Bearer ${session.token}` }
+        }).catch(() => null)
 
-      if (syncRes && syncRes.ok) {
-        const data = await syncRes.json()
-        if (data.lastReset && data.lastReset !== lastReset) {
-          setLastReset(data.lastReset)
-          setTransactions(data.transactions || [])
-        } else if (Array.isArray(data.transactions) && data.transactions.length !== transactions.length) {
-          setTransactions(data.transactions)
+        if (txRes && txRes.ok) {
+          const userTxs = await txRes.json()
+          if (Array.isArray(userTxs)) {
+            setTransactions(userTxs)
+          }
         }
-        if (!silent) setToast('Data berhasil disinkronkan!')
       }
+
+      if (!silent) setToast('Data berhasil disinkronkan!')
     } catch {
       if (!silent) setToast('Gagal menyinkronkan data')
     } finally {
@@ -125,7 +165,7 @@ export default function App() {
       window.removeEventListener('focus', onFocus)
       clearInterval(interval)
     }
-  }, [transactions])
+  }, [session?.token])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -169,47 +209,56 @@ export default function App() {
     const tx = isEdit ? data : { ...data, id: crypto.randomUUID() }
     if (isEdit) setTransactions(items => items.map(item => item.id === tx.id ? tx : item))
     else setTransactions(items => [tx, ...items])
-    setToast(isEdit ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil dicatat')
+    setToast(isEdit ? 'Transaksi diperbarui' : 'Transaksi dicatat')
     setModal(null)
-    if (botStatus.connected) {
-      fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tx)
-      }).catch(() => {})
-    }
+
+    // Save to server (PostgreSQL via user session)
+    fetch('/api/transactions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session?.token ? { 'Authorization': `Bearer ${session.token}` } : {})
+      },
+      body: JSON.stringify(tx)
+    }).catch(() => {})
   }
 
   const deleteTransaction = id => {
     if (window.confirm('Hapus transaksi ini? Tindakan ini tidak dapat dibatalkan.')) {
       setTransactions(items => items.filter(item => item.id !== id))
       setToast('Transaksi dihapus')
-      if (botStatus.connected) {
-        fetch(`/api/transactions/${id}`, { method: 'DELETE' }).catch(() => {})
-      }
+      fetch(`/api/transactions/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...(session?.token ? { 'Authorization': `Bearer ${session.token}` } : {})
+        }
+      }).catch(() => {})
     }
   }
+
   const saveGoal = data => {
     if (data.id) setGoals(items => items.map(item => item.id === data.id ? data : item))
     else setGoals(items => [{ ...data, id: crypto.randomUUID() }, ...items])
-    setToast(data.id ? 'Wishlist diperbarui' : 'Target baru ditambahkan')
+    setToast(data.id ? 'Wishlist diperbarui' : 'Target ditambahkan')
     setModal(null)
   }
+
   const deleteGoal = id => {
     if (window.confirm('Hapus target ini?')) {
       setGoals(items => items.filter(item => item.id !== id))
       setToast('Target dihapus')
     }
   }
+
   const addSaving = (id, amount) => {
     setGoals(items => items.map(goal => goal.id === id ? { ...goal, saved: Math.min(goal.saved + amount, goal.target) } : goal))
-    setToast('Tabungan berhasil ditambahkan')
+    setToast('Tabungan ditambahkan')
     setModal(null)
   }
 
   const saveMonthlyBudget = ({ limit, active }) => {
     setMonthlyBudget(prev => ({ ...prev, limit: Number(limit) || 0, active, month: today.slice(0, 7) }))
-    setToast(active ? `Limit bulanan diatur ke ${rupiah.format(limit)}` : 'Limit bulanan dinonaktifkan')
+    setToast(active ? `Limit diatur: ${rupiah.format(limit)}` : 'Limit dinonaktifkan')
     setModal(null)
   }
 
@@ -217,7 +266,7 @@ export default function App() {
     const safeAmount = Number(amount) || 0
     if (safeAmount <= 0) return
     setSavingsReserve(prev => prev + safeAmount)
-    setToast(`Berhasil menyisihkan ${rupiah.format(safeAmount)} ke dana simpanan`)
+    setToast(`Disisihkan: ${rupiah.format(safeAmount)}`)
     setModal(null)
   }
 
@@ -225,22 +274,23 @@ export default function App() {
     const safeAmount = Number(amount) || 0
     if (safeAmount <= 0) return
     if (safeAmount > savingsReserve) {
-      setToast('Saldo dana simpanan tidak mencukupi')
+      setToast('Saldo simpanan tidak mencukupi')
       return
     }
     setSavingsReserve(prev => prev - safeAmount)
     if (monthlyBudget.active) {
       setMonthlyBudget(prev => ({ ...prev, extraFromSavings: (prev.extraFromSavings || 0) + safeAmount }))
     }
-    setToast(monthlyBudget.active && budgetStatus.isExceeded ? `Dana simpanan ${rupiah.format(safeAmount)} digunakan untuk menutup defisit limit` : `Dana simpanan ${rupiah.format(safeAmount)} dialihkan ke uang siap digunakan`)
+    setToast(`Dana simpanan digunakan: ${rupiah.format(safeAmount)}`)
     setModal(null)
   }
 
   const title = nav.find(item => item.id === view)?.label
   if (!session) return <LoginScreen onLogin={setSession} />
 
-  const firstName = session.name.trim().split(/\s+/)[0]
+  const firstName = (session.name || session.user?.name || 'Teman').trim().split(/\s+/)[0]
   const availableBalance = totals.balance - (savingsReserve || 0)
+
   const page = view === 'summary'
     ? <Summary
         transactions={transactions}
@@ -260,19 +310,19 @@ export default function App() {
       : view === 'wishlist'
         ? <WishlistPage goals={goals} openModal={setModal} onDelete={deleteGoal} />
         : <SettingsPage
-            onLogout={() => setSession(null)}
+            session={session}
+            onLogout={() => {
+              setSession(null)
+              setTransactions([])
+            }}
             onClear={() => {
-              if (window.confirm('Hapus seluruh data keuangan (transaksi, wishlist, limit, dan simpanan)?')) {
-                const nowReset = new Date().toISOString()
-                setLastReset(nowReset)
+              if (window.confirm('Hapus seluruh data keuangan lokal pada browser ini?')) {
+                setLastReset(new Date().toISOString())
                 setTransactions([])
                 setGoals([])
                 setMonthlyBudget({ limit: 0, active: false, extraFromSavings: 0, month: today.slice(0, 7) })
                 setSavingsReserve(0)
-                setToast('Semua data keuangan dihapus')
-                if (botStatus.connected) {
-                  fetch('/api/reset', { method: 'POST' }).catch(() => {})
-                }
+                setToast('Semua data keuangan lokal dihapus')
               }
             }}
             monthlyBudget={monthlyBudget}
@@ -292,35 +342,40 @@ export default function App() {
         <nav aria-label="Navigasi utama">
           {nav.map(({ id, label, icon: Icon }) => (
             <button key={id} className={`nav-item ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>
-              <Icon size={21} weight={view === id ? 'fill' : 'regular'} /><span>{label}</span>
+              <Icon size={19} weight="regular" /><span>{label}</span>
             </button>
           ))}
         </nav>
         <div className="sidebar-bottom">
           <div className="account-card">
-            <UserCircle size={38} weight="fill" />
+            <UserCircle size={36} weight="regular" />
             <div>
-              <strong>{session.name}</strong>
-              <span>{botStatus.connected && botStatus.botActive ? `Bot @${botStatus.botUsername}` : 'Data tersimpan lokal'}</span>
+              <strong>{session.name || session.user?.name}</strong>
+              <span>{session.email || session.user?.email || 'Akun Aktif'}</span>
             </div>
-            <DotsThree size={22} />
           </div>
         </div>
       </aside>
 
       <main>
         <header className="topbar">
-          <button className="mobile-brand" onClick={() => setView('summary')} aria-label="FinNote, ke ringkasan"><BrandMark /><span><strong>FinNote</strong><small>Catatan keuangan</small></span></button>
+          <button className="mobile-brand" onClick={() => setView('summary')} aria-label="FinNote, ke ringkasan">
+            <BrandMark /><span><strong>FinNote</strong><small>Catatan keuangan</small></span>
+          </button>
           <div className="topbar-copy">
             <p className="eyebrow">
               {monthLabel.format(new Date())}
               {isTelegramMiniApp && <span className="tma-badge">📱 Telegram</span>}
             </p>
-            <h1>{view === 'summary' ? `Selamat datang, ${firstName}` : title}</h1>
+            <h1>{view === 'summary' ? <>Selamat datang, {firstName} <DoodleSparkle size={15} /></> : title}</h1>
           </div>
           <div className="header-actions">
-            <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}>{theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}</button>
-            <button className="primary header-cta" onClick={() => setModal({ kind: 'transaction', type: 'expense' })}>Catat transaksi<span className="button-orb"><Plus size={17} weight="bold" /></span></button>
+            <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}>
+              {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+            </button>
+            <button className="primary header-cta" onClick={() => setModal({ kind: 'transaction', type: 'expense' })}>
+              Catat transaksi<span className="button-orb"><Plus size={16} weight="bold" /></span>
+            </button>
           </div>
         </header>
 
@@ -330,18 +385,25 @@ export default function App() {
       <nav className="mobile-nav" aria-label="Navigasi mobile">
         {nav.map(({ id, label, icon: Icon }) => (
           <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
-            <Icon size={22} weight={view === id ? 'fill' : 'regular'} /><span>{label}</span>
+            <Icon size={20} weight="regular" /><span>{label}</span>
           </button>
         ))}
       </nav>
 
-      {modal?.kind === 'transaction' && <TransactionModal initial={modal.item} defaultType={modal.type} onClose={() => setModal(null)} onSave={saveTransaction} />}
+      {modal?.kind === 'transaction' && (
+        <TransactionModal
+          initial={modal.item}
+          defaultType={modal.type}
+          onClose={() => setModal(null)}
+          onSave={saveTransaction}
+        />
+      )}
       {modal?.kind === 'goal' && <GoalModal initial={modal.item} onClose={() => setModal(null)} onSave={saveGoal} />}
       {modal?.kind === 'saving' && <SavingModal goal={modal.item} onClose={() => setModal(null)} onSave={addSaving} />}
       {modal?.kind === 'budget' && <BudgetModal currentLimit={monthlyBudget.limit} isActive={monthlyBudget.active} onClose={() => setModal(null)} onSave={saveMonthlyBudget} />}
       {modal?.kind === 'deposit-savings' && <DepositSavingsModal availableBalance={availableBalance} onClose={() => setModal(null)} onSave={depositSavings} />}
       {modal?.kind === 'use-savings' && <UseSavingsModal savingsReserve={savingsReserve} deficit={budgetStatus.isExceeded ? Math.abs(budgetStatus.remaining) : 0} onClose={() => setModal(null)} onSave={useSavingsForBudget} />}
-      {toast && <div className="toast" role="status"><Check size={18} weight="bold" />{toast}</div>}
+      {toast && <div className="toast" role="status"><Check size={16} weight="bold" />{toast}</div>}
     </div>
   )
 }
@@ -368,54 +430,47 @@ function Summary({
       : sorted
   }, [transactions])
   const donutStops = buildDonutStops(categories.map(([, value]) => value), totals.expense)
+
   return (
     <div className="dashboard-grid">
       {monthlyBudget?.active && budgetStatus?.isExceeded && (
         <aside className="overbudget-alert" role="alert" aria-live="polite">
-          <div className="overbudget-icon">
-            <Warning size={24} weight="fill" />
-          </div>
+          <div className="overbudget-icon"><Warning size={22} weight="fill" /></div>
           <div className="overbudget-content">
             <div className="overbudget-header">
-              <strong>Limit Pengeluaran Bulanan Terlampaui!</strong>
+              <strong>Limit Pengeluaran Bulanan Terlampaui</strong>
               <span className="overbudget-chip">Defisit {rupiah.format(Math.abs(budgetStatus.remaining))}</span>
             </div>
             <p>
-              Pengeluaran bulan ini mencapai <strong>{rupiah.format(monthlyExpense)}</strong>, melebihi limit {rupiah.format(effectiveLimit)}. Gunakan dana simpanan cadangan untuk menutup defisit belanja.
+              Pengeluaran mencapai <strong>{rupiah.format(monthlyExpense)}</strong>, melebihi limit {rupiah.format(effectiveLimit)}.
             </p>
           </div>
           <div className="overbudget-actions">
             {savingsReserve > 0 ? (
-              <button
-                type="button"
-                className="overbudget-btn primary"
-                onClick={() => openModal({ kind: 'use-savings' })}
-              >
-                <Vault size={17} weight="bold" />
-                <span>Gunakan Simpanan</span>
+              <button type="button" className="overbudget-btn primary" onClick={() => openModal({ kind: 'use-savings' })}>
+                Gunakan Simpanan
               </button>
             ) : (
-              <button
-                type="button"
-                className="overbudget-btn secondary"
-                onClick={() => openModal({ kind: 'deposit-savings' })}
-              >
-                <Plus size={17} weight="bold" />
-                <span>Isi Dana Simpanan</span>
+              <button type="button" className="overbudget-btn secondary" onClick={() => openModal({ kind: 'deposit-savings' })}>
+                Isi Simpanan
               </button>
             )}
           </div>
         </aside>
       )}
 
+      {/* Balance Card (Minimal Doodles) */}
       <section className="balance-card">
         <div className="balance-main">
-          <div className="balance-heading"><div><span className="section-icon"><Wallet size={20} weight="bold" /></span><p>Total akumulasi uang</p></div><span className="month-chip"><CalendarBlank size={16} weight="bold" />{monthLabel.format(new Date())}</span></div>
+          <div className="balance-heading">
+            <p>Total akumulasi uang <DoodleSparkle size={12} /></p>
+            <span className="month-chip">{monthLabel.format(new Date())}</span>
+          </div>
           <strong className={`balance-value ${amountSizeClass(totals.balance)}`}>{rupiah.format(totals.balance)}</strong>
+          <DoodleSquiggle />
 
           <div className="balance-split-row">
             <div className="split-item ready">
-              <span className="split-icon"><Coins size={18} weight="fill" /></span>
               <div>
                 <span className="split-label">Siap pakai</span>
                 <strong className="split-value">{rupiah.format(availableBalance)}</strong>
@@ -423,7 +478,6 @@ function Summary({
             </div>
             <div className="split-divider" aria-hidden="true" />
             <div className="split-item savings">
-              <span className="split-icon"><Vault size={18} weight="fill" /></span>
               <div>
                 <span className="split-label">Simpanan</span>
                 <strong className="split-value">{rupiah.format(savingsReserve || 0)}</strong>
@@ -432,11 +486,19 @@ function Summary({
           </div>
 
           <div className="hero-totals">
-            <div><span className="semantic income"><TrendUp size={18} weight="bold" /></span><p>Pemasukan</p><strong>{rupiah.format(totals.income)}</strong></div>
-            <div><span className="semantic expense"><TrendDown size={18} weight="bold" /></span><p>Pengeluaran</p><strong>{rupiah.format(totals.expense)}</strong></div>
+            <div>
+              <p>↑ Pemasukan</p>
+              <strong>{rupiah.format(totals.income)}</strong>
+            </div>
+            <div>
+              <p>↓ Pengeluaran</p>
+              <strong>{rupiah.format(totals.expense)}</strong>
+            </div>
           </div>
-          <div className="budget-line"><span style={{ width: `${spentPercent}%` }} /></div><small>{spentPercent}% pemasukan sudah digunakan</small>
+          <div className="budget-line"><span style={{ width: `${spentPercent}%` }} /></div>
+          <small>{spentPercent}% pemasukan sudah digunakan</small>
         </div>
+
         <div className="chart-column">
           <div className="chart-head"><span>Pengeluaran</span><button onClick={() => setView('transactions')}>Detail</button></div>
           <div className="donut" aria-hidden="true" style={donutStops ? { '--donut-fill': `conic-gradient(from -90deg, ${donutStops})` } : undefined} />
@@ -445,23 +507,15 @@ function Summary({
       </section>
 
       <div className="quick-actions">
-        <button
-          type="button"
-          className="quick income"
-          onClick={() => openModal({ kind: 'transaction', type: 'income' })}
-        >
-          <span className="quick-icon"><Plus size={18} weight="bold" /></span>
+        <button type="button" className="quick income" onClick={() => openModal({ kind: 'transaction', type: 'income' })}>
+          <span className="quick-icon"><Plus size={16} weight="bold" /></span>
           <div className="quick-copy">
             <strong>Pemasukan</strong>
             <small>Tambah pemasukan</small>
           </div>
         </button>
-        <button
-          type="button"
-          className="quick expense"
-          onClick={() => openModal({ kind: 'transaction', type: 'expense' })}
-        >
-          <span className="quick-icon"><Minus size={18} weight="bold" /></span>
+        <button type="button" className="quick expense" onClick={() => openModal({ kind: 'transaction', type: 'expense' })}>
+          <span className="quick-icon"><Minus size={16} weight="bold" /></span>
           <div className="quick-copy">
             <strong>Pengeluaran</strong>
             <small>Tambah pengeluaran</small>
@@ -472,20 +526,11 @@ function Summary({
       <section className="budget-vault-grid" aria-label="Limit anggaran dan dana simpanan">
         <article className={`panel bv-card budget-card ${monthlyBudget?.active ? budgetStatus.status : 'inactive'}`}>
           <div className="bv-card-head">
-            <div className="bv-card-title">
-              <span className={`bv-icon budget ${budgetStatus.status}`}>
-                <SlidersHorizontal size={20} weight="bold" />
-              </span>
-              <div>
-                <h3>Limit Bulanan</h3>
-                <p>{monthlyBudget?.active ? 'Batas belanja bulan ini' : 'Batas belanja dinonaktifkan'}</p>
-              </div>
+            <div>
+              <h3>Limit Bulanan</h3>
+              <p>{monthlyBudget?.active ? 'Batas belanja bulan ini' : 'Batas belanja dinonaktifkan'}</p>
             </div>
-            <button
-              type="button"
-              className="text-button bv-edit-btn"
-              onClick={() => openModal({ kind: 'budget' })}
-            >
+            <button type="button" className="text-button bv-edit-btn" onClick={() => openModal({ kind: 'budget' })}>
               {monthlyBudget?.active ? 'Ubah limit' : 'Atur limit'}
             </button>
           </div>
@@ -520,37 +565,12 @@ function Summary({
                 </span>
                 <span className="bv-percent">{budgetStatus.percent}%</span>
               </div>
-
-              {monthlyBudget?.extraFromSavings > 0 && (
-                <div className="bv-extra-note">
-                  <Coins size={14} weight="fill" />
-                  <span>Termasuk +{rupiah.format(monthlyBudget.extraFromSavings)} dari dana simpanan</span>
-                </div>
-              )}
-
-              {(budgetStatus.isExceeded || budgetStatus.isWarning) && (
-                <div className="bv-quick-relief">
-                  <button
-                    type="button"
-                    className="secondary bv-relief-btn"
-                    onClick={() => openModal({ kind: 'use-savings' })}
-                  >
-                    <Vault size={16} weight="bold" />
-                    <span>Gunakan Simpanan</span>
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <div className="bv-card-empty">
-              <p>Belum ada batas belanja yang aktif. Tetapkan limit bulanan agar pengeluaran tetap terkontrol.</p>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => openModal({ kind: 'budget' })}
-              >
-                <Plus size={16} weight="bold" />
-                <span>Pasang Limit Pengeluaran</span>
+              <p>Belum ada batas belanja aktif. Pasang limit agar pengeluaran tetap terkontrol.</p>
+              <button type="button" className="secondary" onClick={() => openModal({ kind: 'budget' })}>
+                Pasang Limit
               </button>
             </div>
           )}
@@ -558,20 +578,11 @@ function Summary({
 
         <article className="panel bv-card vault-card">
           <div className="bv-card-head">
-            <div className="bv-card-title">
-              <span className="bv-icon vault">
-                <Vault size={20} weight="fill" />
-              </span>
-              <div>
-                <h3>Dana Simpanan</h3>
-                <p>Pemisahan uang cadangan</p>
-              </div>
+            <div>
+              <h3>Dana Simpanan</h3>
+              <p>Pemisahan uang cadangan</p>
             </div>
-            <button
-              type="button"
-              className="text-button bv-edit-btn"
-              onClick={() => openModal({ kind: 'deposit-savings' })}
-            >
+            <button type="button" className="text-button bv-edit-btn" onClick={() => openModal({ kind: 'deposit-savings' })}>
               + Sisihkan
             </button>
           </div>
@@ -586,18 +597,13 @@ function Summary({
 
             <p className="bv-vault-desc">
               {savingsReserve > 0
-                ? 'Dana cadangan terpisah yang siap digunakan jika pengeluaran melebihi limit bulanan.'
-                : 'Belum ada saldo simpanan. Sisihkan uang untuk cadangan jika kuota bulanan habis.'}
+                ? 'Dana cadangan terpisah yang siap digunakan jika pengeluaran melebihi limit.'
+                : 'Belum ada saldo simpanan cadangan.'}
             </p>
 
             <div className="bv-vault-actions">
-              <button
-                type="button"
-                className="primary bv-action-btn"
-                onClick={() => openModal({ kind: 'deposit-savings' })}
-              >
-                <Plus size={16} weight="bold" />
-                <span>Sisihkan Uang</span>
+              <button type="button" className="primary bv-action-btn" onClick={() => openModal({ kind: 'deposit-savings' })}>
+                Sisihkan Uang
               </button>
               <button
                 type="button"
@@ -605,16 +611,30 @@ function Summary({
                 disabled={!savingsReserve || savingsReserve <= 0}
                 onClick={() => openModal({ kind: 'use-savings' })}
               >
-                <Coins size={16} weight="bold" />
-                <span>Gunakan Simpanan</span>
+                Gunakan Simpanan
               </button>
             </div>
           </div>
         </article>
       </section>
 
-      <section className="panel transactions-panel"><PanelHeader title="Transaksi terbaru" action="Lihat semua" onClick={() => setView('transactions')} />{transactions.length ? <div className="transaction-list">{transactions.slice(0, 5).map(item => <TransactionRow key={item.id} item={item} />)}</div> : <EmptyState icon={BookOpen} title="Catatanmu masih kosong" text="Catat transaksi pertama. Ringkasan bulan ini akan terisi otomatis." action="Mulai mencatat" onAction={() => openModal({ kind: 'transaction', type: 'expense' })} />}</section>
-      <section className="panel wishlist-panel"><PanelHeader title="Wishlist" action="Lihat semua" onClick={() => setView('wishlist')} />{goals.length ? <div className="goal-list compact">{goals.slice(0, 2).map(goal => <GoalCard key={goal.id} goal={goal} compact onSaving={() => openModal({ kind: 'saving', item: goal })} />)}</div> : <EmptyState icon={Heart} title="Belum ada wishlist" text="Simpan target dan pantau dana yang sudah terkumpul." action="Buat wishlist" onAction={() => openModal({ kind: 'goal' })} />}</section>
+      <section className="panel transactions-panel">
+        <PanelHeader title="Transaksi terbaru" action="Lihat semua" onClick={() => setView('transactions')} />
+        {transactions.length ? (
+          <div className="transaction-list">{transactions.slice(0, 5).map(item => <TransactionRow key={item.id} item={item} />)}</div>
+        ) : (
+          <EmptyState doodle={<DoodleReceiptEmpty />} title="Catatanmu masih kosong" text="Catat transaksi pertama. Ringkasan bulan ini akan terisi otomatis." action="Mulai mencatat" onAction={() => openModal({ kind: 'transaction', type: 'expense' })} />
+        )}
+      </section>
+
+      <section className="panel wishlist-panel">
+        <PanelHeader title="Wishlist" action="Lihat semua" onClick={() => setView('wishlist')} />
+        {goals.length ? (
+          <div className="goal-list compact">{goals.slice(0, 2).map(goal => <GoalCard key={goal.id} goal={goal} compact onSaving={() => openModal({ kind: 'saving', item: goal })} />)}</div>
+        ) : (
+          <EmptyState doodle={<DoodleHeartEmpty />} title="Belum ada wishlist" text="Simpan target dan pantau dana yang sudah terkumpul." action="Buat wishlist" onAction={() => openModal({ kind: 'goal' })} />
+        )}
+      </section>
     </div>
   )
 }
@@ -653,13 +673,10 @@ function TransactionsPage({ transactions, openModal, onDelete }) {
   }, [typeTransactions, category, query])
 
   const activePeriod = periodOptions.find(item => item.value === period)?.label.toLowerCase()
-
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 15
 
-  useEffect(() => {
-    setPage(1)
-  }, [query, category, period, typeFilter])
+  useEffect(() => { setPage(1) }, [query, category, period, typeFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -680,9 +697,8 @@ function TransactionsPage({ transactions, openModal, onDelete }) {
             <strong className={`${amountSizeClass(periodTotals.balance)} ${periodTotals.balance < 0 ? 'expense' : 'income'}`}>
               {rupiah.format(periodTotals.balance)}
             </strong>
-            <small>{periodTransactions.length} total transaksi periode ini</small>
+            <small>{periodTransactions.length} transaksi</small>
           </div>
-          <span className="tx-stat-icon balance"><Receipt size={28} weight="bold" /></span>
         </div>
         <div className="tx-summary-card income">
           <div>
@@ -690,7 +706,6 @@ function TransactionsPage({ transactions, openModal, onDelete }) {
             <strong className={`income ${amountSizeClass(periodTotals.income)}`}>{rupiah.format(periodTotals.income)}</strong>
             <small>{periodTransactions.filter(t => t.type === 'income').length} transaksi</small>
           </div>
-          <span className="tx-stat-icon income"><TrendUp size={26} weight="bold" /></span>
         </div>
         <div className="tx-summary-card expense">
           <div>
@@ -698,7 +713,6 @@ function TransactionsPage({ transactions, openModal, onDelete }) {
             <strong className={`expense ${amountSizeClass(periodTotals.expense)}`}>{rupiah.format(periodTotals.expense)}</strong>
             <small>{periodTransactions.filter(t => t.type === 'expense').length} transaksi</small>
           </div>
-          <span className="tx-stat-icon expense"><TrendDown size={26} weight="bold" /></span>
         </div>
       </div>
 
@@ -706,29 +720,31 @@ function TransactionsPage({ transactions, openModal, onDelete }) {
         <div className="tx-header-bar">
           <div className="type-tabs" role="tablist" aria-label="Filter tipe transaksi">
             <button type="button" role="tab" aria-selected={typeFilter === 'all'} className={typeFilter === 'all' ? 'active' : ''} onClick={() => { setTypeFilter('all'); setCategory('Semua kategori') }}>Semua ({periodTransactions.length})</button>
-            <button type="button" role="tab" aria-selected={typeFilter === 'income'} className={typeFilter === 'income' ? 'active' : ''} onClick={() => { setTypeFilter('income'); setCategory('Semua kategori') }}><TrendUp size={16} />Pemasukan</button>
-            <button type="button" role="tab" aria-selected={typeFilter === 'expense'} className={typeFilter === 'expense' ? 'active' : ''} onClick={() => { setTypeFilter('expense'); setCategory('Semua kategori') }}><TrendDown size={16} />Pengeluaran</button>
+            <button type="button" role="tab" aria-selected={typeFilter === 'income'} className={typeFilter === 'income' ? 'active' : ''} onClick={() => { setTypeFilter('income'); setCategory('Semua kategori') }}>Pemasukan</button>
+            <button type="button" role="tab" aria-selected={typeFilter === 'expense'} className={typeFilter === 'expense' ? 'active' : ''} onClick={() => { setTypeFilter('expense'); setCategory('Semua kategori') }}>Pengeluaran</button>
           </div>
-          <button className="primary tx-add-btn" onClick={() => openModal({ kind: 'transaction', type: typeFilter === 'income' ? 'income' : 'expense' })}><Plus size={18} />Catat transaksi</button>
+          <button className="primary tx-add-btn" onClick={() => openModal({ kind: 'transaction', type: typeFilter === 'income' ? 'income' : 'expense' })}>
+            <Plus size={16} weight="bold" />Catat transaksi
+          </button>
         </div>
 
         <div className="list-toolbar">
           <div className="search">
-            <MagnifyingGlass size={19} />
-            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Cari transaksi berdasarkan nama, kategori, atau catatan..." aria-label="Cari transaksi" />
+            <MagnifyingGlass size={18} />
+            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Cari transaksi..." aria-label="Cari transaksi" />
           </div>
           <div className="select-wrap period-filter">
             <select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Filter periode">
               {periodOptions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>
-            <CaretDown size={16} />
+            <CaretDown size={14} />
           </div>
           <div className="select-wrap category-filter">
             <select value={category} onChange={event => setCategory(event.target.value)} aria-label="Filter kategori">
               <option>Semua kategori</option>
               {categories.map(item => <option key={item}>{item}</option>)}
             </select>
-            <CaretDown size={16} />
+            <CaretDown size={14} />
           </div>
         </div>
 
@@ -758,7 +774,7 @@ function TransactionsPage({ transactions, openModal, onDelete }) {
           <EmptyState
             icon={MagnifyingGlass}
             title="Tidak ada transaksi"
-            text={query || category !== 'Semua kategori' || typeFilter !== 'all' ? 'Coba kata kunci atau filter yang berbeda.' : `Belum ada catatan transaksi untuk ${activePeriod}.`}
+            text={query || category !== 'Semua kategori' || typeFilter !== 'all' ? 'Coba kata kunci atau filter lain.' : `Belum ada catatan transaksi untuk ${activePeriod}.`}
             action="Tambah transaksi baru"
             onAction={() => openModal({ kind: 'transaction', type: typeFilter === 'income' ? 'income' : 'expense' })}
           />
@@ -832,159 +848,405 @@ function Pagination({ currentPage, totalPages, onPageChange, startIdx, endIdx, t
 function WishlistPage({ goals, openModal, onDelete }) {
   const totalTarget = goals.reduce((sum, goal) => sum + goal.target, 0)
   const totalSaved = goals.reduce((sum, goal) => sum + goal.saved, 0)
-  return <div className="page-stack"><div className="wishlist-heading"><div><p>Total tabungan wishlist</p><strong className={amountSizeClass(totalSaved)}>{rupiah.format(totalSaved)}</strong><span>dari target {rupiah.format(totalTarget)}</span></div><button className="primary" onClick={() => openModal({ kind: 'goal' })}><Plus size={18} />Tambah wishlist</button></div>
-    {goals.length ? <div className="goals-grid">{goals.map(goal => <GoalCard key={goal.id} goal={goal} onSaving={() => openModal({ kind: 'saving', item: goal })} onEdit={() => openModal({ kind: 'goal', item: goal })} onDelete={() => onDelete(goal.id)} />)}</div> : <section className="panel"><EmptyState icon={Heart} title="Wishlist masih kosong" text="Tambahkan barang atau pengalaman yang ingin kamu wujudkan." action="Buat wishlist" onAction={() => openModal({ kind: 'goal' })} /></section>}
-  </div>
+  return (
+    <div className="page-stack">
+      <div className="wishlist-heading">
+        <div>
+          <p>Total tabungan wishlist</p>
+          <strong className={amountSizeClass(totalSaved)}>{rupiah.format(totalSaved)}</strong>
+          <span>dari target {rupiah.format(totalTarget)}</span>
+        </div>
+        <button className="primary" onClick={() => openModal({ kind: 'goal' })}>
+          <Plus size={16} weight="bold" />Tambah wishlist
+        </button>
+      </div>
+      {goals.length ? (
+        <div className="goals-grid">
+          {goals.map(goal => (
+            <GoalCard
+              key={goal.id}
+              goal={goal}
+              onSaving={() => openModal({ kind: 'saving', item: goal })}
+              onEdit={() => openModal({ kind: 'goal', item: goal })}
+              onDelete={() => onDelete(goal.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <section className="panel">
+          <EmptyState icon={Heart} title="Wishlist masih kosong" text="Tambahkan barang atau target yang ingin diwujudkan." action="Buat wishlist" onAction={() => openModal({ kind: 'goal' })} />
+        </section>
+      )}
+    </div>
+  )
 }
 
-function SettingsPage({ onLogout, onClear, monthlyBudget, savingsReserve, openModal, botStatus, onSync, isSyncing }) {
-  return <div className="settings-grid">
-    <div className="settings-content">
-      <section className="panel settings-section">
-        <div className="settings-icon"><PaperPlaneTilt size={26} weight="bold" /></div>
-        <div>
-          <h2>Integrasi Bot Telegram</h2>
-          <p>Catat transaksi praktis lewat chat Telegram langsung ke FinNote.</p>
-        </div>
+function SettingsPage({ session, onLogout, onClear, monthlyBudget, savingsReserve, openModal, botStatus, onSync, isSyncing }) {
+  const [pairingCode, setPairingCode] = useState(null)
+  const [pairingLoading, setPairingLoading] = useState(false)
 
-        <div className="setting-row">
+  const generatePairCode = async () => {
+    setPairingLoading(true)
+    try {
+      const res = await fetch('/api/telegram/pair-code', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.token}`
+        }
+      })
+      const data = await res.json()
+      if (res.ok && data.code) {
+        setPairingCode(data.code)
+      } else {
+        alert(data.error || 'Gagal membuat kode pairing.')
+      }
+    } catch {
+      alert('Tidak dapat menghubungi server bot.')
+    } finally {
+      setPairingLoading(false)
+    }
+  }
+
+  return (
+    <div className="settings-grid">
+      <div className="settings-content">
+        {/* Telegram Integration (Cleaned of slop icons) */}
+        <section className="panel settings-section">
           <div>
-            <strong>Status Server & Bot</strong>
-            <span>
-              {botStatus?.connected && botStatus?.botActive
-                ? `🟢 Terhubung aktif sebagai @${botStatus.botUsername}`
-                : botStatus?.connected
-                  ? '🟡 Server aktif • Token bot belum diisi di .env'
-                  : '⚪ Server bot offline • Jalankan "npm run bot" untuk mengaktifkan'}
-            </span>
+            <h2>Integrasi Bot Telegram</h2>
+            <p>Hubungkan akun Telegram agar transaksi chat otomatis masuk ke akun FinNote milikmu.</p>
           </div>
-          <div className="setting-row-actions">
+
+          <div className="setting-row">
+            <div>
+              <strong>Status Server & Bot</strong>
+              <span>
+                {botStatus?.connected && botStatus?.botActive
+                  ? `🟢 Terhubung aktif sebagai @${botStatus.botUsername}`
+                  : botStatus?.connected
+                    ? '🟡 Server aktif • Token bot belum diisi di .env'
+                    : '⚪ Server bot offline • Jalankan "npm run bot" untuk mengaktifkan'}
+              </span>
+            </div>
+            <div className="setting-row-actions">
+              <button
+                className="secondary"
+                type="button"
+                onClick={onSync}
+                disabled={isSyncing}
+                title="Sinkronkan data transaksi"
+              >
+                <ArrowClockwise size={16} className={isSyncing ? 'spin' : ''} />
+                <span>{isSyncing ? 'Sinkron...' : 'Sinkronkan'}</span>
+              </button>
+              {botStatus?.botUsername && (
+                <a
+                  href={`https://t.me/${botStatus.botUsername}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600' }}
+                >
+                  Buka Bot
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Telegram Pairing Action */}
+          <div className="setting-row" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+            <div>
+              <strong>Pairing Akun Telegram</strong>
+              <span>Dapatkan kode 6 digit untuk menghubungkan akun chat dengan akun ini.</span>
+              {pairingCode && (
+                <div style={{ marginTop: '8px', padding: '8px 12px', background: 'var(--accent-2)', borderRadius: '8px', color: 'var(--accent-strong)', fontWeight: 'bold' }}>
+                  Kirim ke bot: <code>/link {pairingCode}</code> (berlaku 15 menit)
+                </div>
+              )}
+            </div>
             <button
               className="secondary"
               type="button"
-              onClick={onSync}
-              disabled={isSyncing}
-              title="Sinkronkan data transaksi antara browser dan bot"
+              disabled={pairingLoading}
+              onClick={generatePairCode}
             >
-              <ArrowClockwise size={18} className={isSyncing ? 'spin' : ''} />
-              <span>{isSyncing ? 'Sinkron...' : 'Sinkronkan'}</span>
+              {pairingLoading ? 'Membuat...' : pairingCode ? 'Kode Baru' : 'Buat Kode Pairing'}
             </button>
-            {botStatus?.botUsername && (
-              <a
-                href={`https://t.me/${botStatus.botUsername}`}
-                target="_blank"
-                rel="noreferrer"
-                className="primary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none', padding: '10px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: '600' }}
-              >
-                <PaperPlaneTilt size={16} weight="bold" />
-                <span>Buka Bot</span>
-              </a>
-            )}
           </div>
-        </div>
+        </section>
 
-        <div className="telegram-guide-box">
-          <p className="guide-title"><strong>💡 Panduan Cepat Menghubungkan Bot:</strong></p>
-          <div className="guide-steps">
-            <div className="guide-step">
-              <span className="step-num">1</span>
-              <div>
-                <strong>Buat Bot & Dapatkan Token</strong>
-                <p>Buka <a href="https://t.me/botfather" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>@BotFather</a> di Telegram, kirim <code>/newbot</code>, lalu salin token bot.</p>
-              </div>
-            </div>
-            <div className="guide-step">
-              <span className="step-num">2</span>
-              <div>
-                <strong>Simpan Token ke File .env</strong>
-                <p>Buka file <code>.env</code> di folder proyek, isi <code>TELEGRAM_BOT_TOKEN=token_kamu</code>, lalu jalankan <code>npm run bot</code>.</p>
-              </div>
-            </div>
-            <div className="guide-step">
-              <span className="step-num">3</span>
-              <div>
-                <strong>Ketik Chat untuk Mencatat</strong>
-                <p>Chat bot Telegram dengan format santai: <code>kopi 25k</code>, <code>bensin 50rb</code>, <code>/saldo</code>, <code>/rekap</code>, atau <code>/reset</code>.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel settings-section">
-        <div className="settings-icon"><SlidersHorizontal size={26} weight="bold" /></div>
-        <div><h2>Limit Anggaran & Simpanan</h2><p>Atur batas belanja bulanan dan alokasi dana cadangan.</p></div>
-        <div className="setting-row">
+        {/* Budget & Vault */}
+        <section className="panel settings-section">
           <div>
-            <strong>Limit Pengeluaran Bulanan</strong>
-            <span>
-              {monthlyBudget?.active
-                ? `Aktif: ${rupiah.format(monthlyBudget.limit)} / bulan${monthlyBudget.extraFromSavings ? ` (+ ${rupiah.format(monthlyBudget.extraFromSavings)} dari simpanan)` : ''}`
-                : 'Saat ini dinonaktifkan'}
-            </span>
+            <h2>Limit Anggaran & Simpanan</h2>
+            <p>Atur batas belanja bulanan dan alokasi dana cadangan.</p>
           </div>
-          <button className="secondary" onClick={() => openModal({ kind: 'budget' })}>
-            <SlidersHorizontal size={18} />Atur limit
-          </button>
-        </div>
-        <div className="setting-row">
-          <div>
-            <strong>Dana Simpanan Cadangan</strong>
-            <span>Total tersimpan: {rupiah.format(savingsReserve || 0)}</span>
-          </div>
-          <div className="setting-row-actions">
-            <button className="secondary" onClick={() => openModal({ kind: 'deposit-savings' })}>
-              <Coins size={18} />Sisihkan
+          <div className="setting-row">
+            <div>
+              <strong>Limit Pengeluaran Bulanan</strong>
+              <span>
+                {monthlyBudget?.active
+                  ? `Aktif: ${rupiah.format(monthlyBudget.limit)} / bulan${monthlyBudget.extraFromSavings ? ` (+ ${rupiah.format(monthlyBudget.extraFromSavings)} dari simpanan)` : ''}`
+                  : 'Saat ini dinonaktifkan'}
+              </span>
+            </div>
+            <button className="secondary" onClick={() => openModal({ kind: 'budget' })}>
+              <SlidersHorizontal size={16} />Atur limit
             </button>
-            {savingsReserve > 0 && (
-              <button className="secondary" onClick={() => openModal({ kind: 'use-savings' })}>
-                <Vault size={18} />Gunakan
+          </div>
+          <div className="setting-row">
+            <div>
+              <strong>Dana Simpanan Cadangan</strong>
+              <span>Total tersimpan: {rupiah.format(savingsReserve || 0)}</span>
+            </div>
+            <div className="setting-row-actions">
+              <button className="secondary" onClick={() => openModal({ kind: 'deposit-savings' })}>
+                Sisihkan
               </button>
-            )}
+              {savingsReserve > 0 && (
+                <button className="secondary" onClick={() => openModal({ kind: 'use-savings' })}>
+                  Gunakan
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="panel settings-section">
-        <div className="settings-icon"><ShieldCheck size={26} weight="bold" /></div>
-        <div><h2>Data dan sesi</h2><p>Kontrol data yang tersimpan pada browser ini.</p></div>
-        <div className="setting-row"><div><strong>Hapus data keuangan</strong><span>Menghapus semua transaksi, wishlist, limit, dan simpanan.</span></div><button className="danger-button" onClick={onClear}><Trash size={18} />Hapus data</button></div>
-        <div className="setting-row"><div><strong>Keluar dari FinNote</strong><span>Data keuangan tetap tersimpan setelah keluar.</span></div><button className="secondary" onClick={onLogout}><SignOut size={18} />Keluar</button></div>
-      </section>
+        {/* Session & Account */}
+        <section className="panel settings-section">
+          <div>
+            <h2>Data dan Akun</h2>
+            <p>Informasi akun aktif dan kontrol data lokal.</p>
+          </div>
+          <div className="setting-row">
+            <div>
+              <strong>Akun Pengguna</strong>
+              <span>{session?.name || session?.user?.name} ({session?.email || session?.user?.email})</span>
+            </div>
+            <button className="secondary" onClick={onLogout}>
+              <SignOut size={16} />Keluar
+            </button>
+          </div>
+          <div className="setting-row">
+            <div>
+              <strong>Hapus data lokal</strong>
+              <span>Menghapus cache transaksi dan limit pada browser ini.</span>
+            </div>
+            <button className="danger-button" onClick={onClear}>
+              <Trash size={16} />Hapus data
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <aside className="settings-preview" aria-label="Preview tema">
+        <div className="preview-brand"><BrandMark />FinNote</div>
+        <div className="preview-copy">
+          <span>SISTEM</span>
+          <strong>Multi-User & PostgreSQL</strong>
+          <p>Pencatatan keuangan dengan isolasi data akun, kalkulator input 4x4, dan integrasi bot Telegram.</p>
+        </div>
+      </aside>
     </div>
-    <aside className="settings-preview" aria-label="Preview tema">
-      <div className="preview-brand"><BrandMark />FinNote</div>
-      <div className="preview-copy"><span>TEMA AKTIF</span><strong>Fintech Obsidian</strong><p>Palet monokrom berkalibrasi tinggi dengan aksen emerald dan rose untuk manajemen keuangan presisi.</p></div>
-      <div className="preview-window"><div className="preview-window-head"><i /><i /><i /></div><div className="preview-window-body"><span /><span /><span /></div></div>
-    </aside>
-  </div>
+  )
 }
 
 function LoginScreen({ onLogin }) {
+  const [mode, setMode] = useState('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
-  const submit = event => {
+  const [loading, setLoading] = useState(false)
+
+  const submit = async event => {
     event.preventDefault()
-    if (!isValidLogin(name)) return setError('Masukkan nama yang valid.')
-    onLogin({ name: name.trim() })
+    setError('')
+    if (!isValidEmail(email)) return setError('Format email tidak valid.')
+    if (!isValidPassword(password)) return setError('Kata sandi minimal 6 karakter.')
+    if (mode === 'register' && !name.trim()) return setError('Nama tidak boleh kosong.')
+
+    setLoading(true)
+    try {
+      const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login'
+      const payload = mode === 'register' ? { email, password, name } : { email, password }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Terjadi kesalahan saat masuk.')
+      }
+      onLogin({
+        token: data.token,
+        user: data.user,
+        name: data.user.name,
+        email: data.user.email
+      })
+    } catch (err) {
+      if (err.message.includes('fetch') || err.message.includes('Failed to fetch')) {
+        // Fallback jika backend offline: izinkan masuk lokal dengan email
+        onLogin({
+          token: null,
+          user: { name: name || email.split('@')[0], email },
+          name: name || email.split('@')[0],
+          email
+        })
+      } else {
+        setError(err.message)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
-  return <main className="login-page">
-    <section className="login-copy t-stagger is-shown"><button className="brand login-brand" type="button"><BrandMark /><span>FinNote</span></button><div><p className="login-kicker t-stagger-line t-stagger-line--1">Keuangan pribadi</p><h1 className="t-stagger-line t-stagger-line--2">Uang lebih tertata.<br />Hidup lebih tenang.</h1><p className="login-description t-stagger-line t-stagger-line--3">Catat pemasukan, pengeluaran, dan target tanpa spreadsheet.</p></div><div className="login-foot"><ShieldCheck size={18} />Data tersimpan di browser perangkat ini</div></section>
-    <section className="login-form-wrap"><form className="login-card" onSubmit={submit}><div className="login-avatar"><UserCircle size={34} weight="fill" /></div><h2>Selamat datang</h2><p>Masuk untuk membuka catatan keuanganmu.</p><Field label="Nama"><input autoFocus autoComplete="name" value={name} onChange={event => setName(event.target.value)} placeholder="Nama kamu" /></Field>{error && <p className="form-error login-error" role="alert">{error}</p>}<button className="primary login-submit">Masuk ke FinNote <span className="button-orb"><ArrowRight size={17} /></span></button><small>Login lokal. Tidak ada data yang dikirim ke server.</small></form></section>
-  </main>
+
+  return (
+    <main className="login-page">
+      <section className="login-copy t-stagger is-shown">
+        <button className="brand login-brand" type="button"><BrandMark /><span>FinNote</span></button>
+        <div>
+          <p className="login-kicker t-stagger-line t-stagger-line--1">Keuangan pribadi multi-user</p>
+          <h1 className="t-stagger-line t-stagger-line--2">Uang lebih tertata.<br />Hidup lebih tenang.</h1>
+          <p className="login-description t-stagger-line t-stagger-line--3">Catat pemasukan, pengeluaran, dan target dengan akun terisolasi yang aman.</p>
+        </div>
+      </section>
+
+      <section className="login-form-wrap">
+        <form className="login-card" onSubmit={submit}>
+          <div className="type-switch" style={{ marginBottom: '16px' }}>
+            <button
+              type="button"
+              className={mode === 'login' ? 'active' : ''}
+              onClick={() => { setMode('login'); setError('') }}
+            >
+              Masuk
+            </button>
+            <button
+              type="button"
+              className={mode === 'register' ? 'active' : ''}
+              onClick={() => { setMode('register'); setError('') }}
+            >
+              Daftar Baru
+            </button>
+          </div>
+
+          <h2>{mode === 'login' ? 'Selamat datang kembali' : 'Buat akun FinNote'}</h2>
+          <p>{mode === 'login' ? 'Masuk untuk membuka catatan keuangan pribadimu.' : 'Daftar untuk mencatat keuangan dari berbagai perangkat.'}</p>
+
+          {mode === 'register' && (
+            <Field label="Nama Lengkap">
+              <input
+                autoFocus
+                autoComplete="name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Contoh: Raka Pratama"
+              />
+            </Field>
+          )}
+
+          <Field label="Alamat Email">
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="nama@email.com"
+            />
+          </Field>
+
+          <Field label="Kata Sandi">
+            <input
+              type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Minimal 6 karakter"
+            />
+          </Field>
+
+          {error && <p className="form-error login-error" role="alert">{error}</p>}
+
+          <button className="primary login-submit" type="submit" disabled={loading}>
+            {loading ? 'Memproses...' : mode === 'login' ? 'Masuk ke FinNote' : 'Daftar Akun'}
+            <span className="button-orb"><ArrowRight size={17} /></span>
+          </button>
+
+          <div className="auth-switch-text">
+            {mode === 'login' ? (
+              <span>Belum punya akun? <button type="button" onClick={() => { setMode('register'); setError('') }}>Daftar sekarang</button></span>
+            ) : (
+              <span>Sudah punya akun? <button type="button" onClick={() => { setMode('login'); setError('') }}>Masuk di sini</button></span>
+            )}
+          </div>
+        </form>
+      </section>
+    </main>
+  )
 }
 
-function PanelHeader({ title, action, onClick }) { return <div className="panel-head"><h2>{title}</h2><button onClick={onClick}>{action}</button></div> }
+function PanelHeader({ title, action, onClick }) {
+  return <div className="panel-head"><h2>{title}</h2><button onClick={onClick}>{action}</button></div>
+}
 
 function TransactionRow({ item, actions, onEdit, onDelete }) {
-  return <div className="transaction-row"><span className={`transaction-icon ${item.type}`}>{iconFor(item.category)}</span><div className="transaction-copy"><strong>{item.title}</strong><span>{item.category}{item.note ? ` • ${item.note}` : ''}</span></div><div className="transaction-value"><strong className={item.type}>{item.type === 'income' ? '+' : '-'}{rupiah.format(item.amount)}</strong><span>{dateLabel.format(new Date(`${item.date}T00:00:00`))}</span></div>{actions && <div className="row-actions"><button onClick={onEdit} aria-label="Edit transaksi"><PencilSimple size={18} /></button><button onClick={onDelete} aria-label="Hapus transaksi"><Trash size={18} /></button></div>}</div>
+  return (
+    <div className="transaction-row">
+      <span className={`transaction-icon ${item.type}`}>{iconFor(item.category)}</span>
+      <div className="transaction-copy">
+        <strong>{item.title}</strong>
+        <span>{item.category}{item.note ? ` • ${item.note}` : ''}</span>
+      </div>
+      <div className="transaction-value">
+        <strong className={item.type}>{item.type === 'income' ? '+' : '-'}{rupiah.format(item.amount)}</strong>
+        <span>{dateLabel.format(new Date(`${item.date}T00:00:00`))}</span>
+      </div>
+      {actions && (
+        <div className="row-actions">
+          <button onClick={onEdit} aria-label="Edit transaksi"><PencilSimple size={16} /></button>
+          <button onClick={onDelete} aria-label="Hapus transaksi"><Trash size={16} /></button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function GoalCard({ goal, compact, onSaving, onEdit, onDelete }) {
   const percent = Math.min(Math.round((goal.saved / goal.target) * 100), 100)
   const Icon = goal.icon === 'camera' ? Camera : Gift
-  return <article className={`goal-card ${compact ? 'compact-card' : ''}`}><div className="goal-visual"><Icon size={compact ? 24 : 32} weight="bold" /></div><div className="goal-content"><div className="goal-title"><div><h3>{goal.name}</h3><p>Target {rupiah.format(goal.target)}</p></div>{!compact && <div className="row-actions"><button onClick={onEdit} aria-label="Edit target"><PencilSimple size={18} /></button><button onClick={onDelete} aria-label="Hapus target"><Trash size={18} /></button></div>}</div><div className="progress"><span style={{ width: `${percent}%` }} /></div><div className="progress-label"><span>{rupiah.format(goal.saved)} terkumpul</span><strong>{percent}%</strong></div>{!compact && <div className="goal-footer"><span><CalendarBlank size={17} />{dateLabel.format(new Date(`${goal.deadline}T00:00:00`))}</span><button className="secondary" onClick={onSaving}>Tambah tabungan</button></div>}{compact && <button className="text-button" onClick={onSaving}>Tambah tabungan</button>}</div></article>
+  return (
+    <article className={`goal-card ${compact ? 'compact-card' : ''}`}>
+      <div className="goal-visual"><Icon size={compact ? 20 : 28} weight="regular" /></div>
+      <div className="goal-content">
+        <div className="goal-title">
+          <div>
+            <h3>{goal.name}</h3>
+            <p>Target {rupiah.format(goal.target)}</p>
+          </div>
+          {!compact && (
+            <div className="row-actions">
+              <button onClick={onEdit} aria-label="Edit target"><PencilSimple size={16} /></button>
+              <button onClick={onDelete} aria-label="Hapus target"><Trash size={16} /></button>
+            </div>
+          )}
+        </div>
+        <div className="progress"><span style={{ width: `${percent}%` }} /></div>
+        <div className="progress-label">
+          <span>{rupiah.format(goal.saved)} terkumpul</span>
+          <strong>{percent}%</strong>
+        </div>
+        {!compact && (
+          <div className="goal-footer">
+            <span>{dateLabel.format(new Date(`${goal.deadline}T00:00:00`))}</span>
+            <button className="secondary" onClick={onSaving}>Tambah tabungan</button>
+          </div>
+        )}
+        {compact && <button className="text-button" onClick={onSaving}>Tambah tabungan</button>}
+      </div>
+    </article>
+  )
 }
 
 function ModalShell({ title, subtitle, onClose, children }) {
@@ -1001,7 +1263,7 @@ function ModalShell({ title, subtitle, onClose, children }) {
             <h2 id="modal-title">{title}</h2>
             <p>{subtitle}</p>
           </div>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Tutup"><X size={20} /></button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Tutup"><X size={18} /></button>
         </div>
         {children}
       </div>
@@ -1009,55 +1271,220 @@ function ModalShell({ title, subtitle, onClose, children }) {
   )
 }
 
+// --- 4x4 Calculator Keypad Transaction Modal ---
 function TransactionModal({ initial, defaultType, onClose, onSave }) {
-  const [form, setForm] = useState(initial || { type: defaultType || 'expense', title: '', category: defaultType === 'income' ? 'Gaji' : 'Makan & Minum', amount: '', date: today, note: '' })
+  const [type, setType] = useState(initial?.type || defaultType || 'expense')
+  const [title, setTitle] = useState(initial?.title || '')
+  const [category, setCategory] = useState(initial?.category || (type === 'income' ? 'Gaji' : 'Makan & Minum'))
+  const [date, setDate] = useState(initial?.date || today)
+  const [note, setNote] = useState(initial?.note || '')
+  const [tokens, setTokens] = useState(() => initial?.amount ? [String(initial.amount)] : ['0'])
   const [error, setError] = useState('')
-  const update = (key, value) => setForm(current => ({ ...current, [key]: value }))
-  const submit = event => {
-    event.preventDefault()
-    if (!form.title.trim() || Number(form.amount) <= 0) return setError('Isi nama transaksi dan nominal yang valid.')
-    onSave({ ...form, title: form.title.trim(), amount: Number(form.amount) })
+
+  const evaluatedAmount = useMemo(() => evaluateKeypadExpression(tokens), [tokens])
+  const formattedDisplay = evaluatedAmount === 0 ? '0' : evaluatedAmount.toLocaleString('id-ID')
+  const exprDisplay = tokens.length > 1
+    ? tokens.map(t => isOperator(t) ? ` ${t} ` : (parseInt(t, 10) || 0).toLocaleString('id-ID')).join('')
+    : ''
+
+  const pressDigit = d => {
+    setTokens(prev => {
+      const copy = [...prev]
+      const last = copy[copy.length - 1]
+      if (isOperator(last)) {
+        if (d === '0' || d === '000') return [...copy, '0']
+        return [...copy, d]
+      }
+      if (last === '0') {
+        if (d === '0' || d === '000') return copy
+        copy[copy.length - 1] = d
+        return copy
+      }
+      if (last.length >= 13) return copy
+      copy[copy.length - 1] = last + d
+      return copy
+    })
   }
-  const options = form.type === 'income' ? ['Gaji', 'Freelance', 'Bonus', 'Investasi', 'Lainnya'] : ['Makan & Minum', 'Belanja', 'Transportasi', 'Tagihan', 'Hiburan', 'Lainnya']
+
+  const pressOp = op => {
+    setTokens(prev => {
+      const last = prev[prev.length - 1]
+      if (isOperator(last)) {
+        const copy = [...prev]
+        copy[copy.length - 1] = op
+        return copy
+      }
+      if (last === '0' && prev.length === 1) return prev
+      return [...prev, op]
+    })
+  }
+
+  const backspace = () => {
+    setTokens(prev => {
+      const last = prev[prev.length - 1]
+      if (isOperator(last)) {
+        return prev.slice(0, -1)
+      }
+      if (last.length <= 1) {
+        if (prev.length > 1) return prev.slice(0, -1)
+        return ['0']
+      }
+      const copy = [...prev]
+      copy[copy.length - 1] = last.slice(0, -1)
+      return copy
+    })
+  }
+
+  const addQuick = val => {
+    setTokens([String(evaluatedAmount + val)])
+  }
+
+  const submit = e => {
+    if (e) e.preventDefault()
+    if (!title.trim() || evaluatedAmount <= 0) {
+      return setError('Isi nama transaksi dan nominal lebih dari Rp 0.')
+    }
+    onSave({
+      ...(initial || {}),
+      type,
+      title: title.trim(),
+      amount: evaluatedAmount,
+      category,
+      date,
+      note
+    })
+  }
+
+  // Keyboard support inside modal
+  useEffect(() => {
+    const onKey = e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return
+      if (e.key >= '0' && e.key <= '9') pressDigit(e.key)
+      else if (e.key === 'Backspace') backspace()
+      else if (e.key === '+') pressOp('+')
+      else if (e.key === '-') pressOp('−')
+      else if (e.key === '*') pressOp('×')
+      else if (e.key === '/') { e.preventDefault(); pressOp('÷') }
+      else if (e.key === 'Enter') submit()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [evaluatedAmount, tokens, title, category, date, note])
+
+  const options = type === 'income'
+    ? ['Gaji', 'Freelance', 'Bonus', 'Investasi', 'Lainnya']
+    : ['Makan & Minum', 'Belanja', 'Transportasi', 'Tagihan', 'Hiburan', 'Lainnya']
+
+  const amountLen = String(evaluatedAmount).length
+  const amountSizeKeypad = amountLen > 10 ? 'small' : amountLen > 7 ? 'medium' : ''
+
   return (
-    <ModalShell title={initial ? 'Ubah transaksi' : 'Catat transaksi'} subtitle="Masukkan transaksi. Ringkasan akan ikut berubah." onClose={onClose}>
-      <form onSubmit={submit} className="form">
-        <div className="type-switch">
-          <button type="button" className={form.type === 'income' ? 'active' : ''} onClick={() => { update('type', 'income'); update('category', 'Gaji') }}>
-            <ArrowDown size={18} />Pemasukan
+    <ModalShell
+      title={initial ? 'Ubah Transaksi' : 'Catat Transaksi ✨'}
+      subtitle="Ketik nominal langsung atau gunakan operator hitung."
+      onClose={onClose}
+    >
+      <div className="keypad-modal">
+        {/* Switcher Tipe */}
+        <div className="type-switch" style={{ marginBottom: '12px' }}>
+          <button
+            type="button"
+            className={type === 'income' ? 'active' : ''}
+            onClick={() => { setType('income'); setCategory('Gaji') }}
+          >
+            <ArrowDown size={16} /> Pemasukan
           </button>
-          <button type="button" className={form.type === 'expense' ? 'active' : ''} onClick={() => { update('type', 'expense'); update('category', 'Makan & Minum') }}>
-            <ArrowUp size={18} />Pengeluaran
+          <button
+            type="button"
+            className={type === 'expense' ? 'active' : ''}
+            onClick={() => { setType('expense'); setCategory('Makan & Minum') }}
+          >
+            <ArrowUp size={16} /> Pengeluaran
           </button>
         </div>
-        <Field label="Nama transaksi">
-          <input autoFocus value={form.title} onChange={event => update('title', event.target.value)} placeholder="Contoh: Makan siang, Gaji bulanan" />
-        </Field>
-        <Field label="Nominal">
-          <MoneyInput value={form.amount} onChange={value => update('amount', value)} />
-        </Field>
-        <div className="form-grid">
-          <Field label="Kategori">
-            <div className="select-input-wrap">
-              <select value={form.category} onChange={event => update('category', event.target.value)}>
-                {options.map(item => <option key={item}>{item}</option>)}
-              </select>
-              <CaretDown size={16} />
-            </div>
-          </Field>
-          <Field label="Tanggal">
-            <input type="date" value={form.date} onChange={event => update('date', event.target.value)} />
-          </Field>
+
+        {/* Hero Amount Display */}
+        <div className="keypad-display-hero">
+          <div className="keypad-expr-line">{exprDisplay}</div>
+          <div className="keypad-amount-row">
+            <span className="keypad-currency">Rp</span>
+            <span className={`keypad-amount-val ${amountSizeKeypad}`}>{formattedDisplay}</span>
+          </div>
         </div>
-        <Field label="Catatan (opsional)">
-          <input value={form.note} onChange={event => update('note', event.target.value)} placeholder="Tambahkan detail singkat" />
-        </Field>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="modal-actions">
-          <button type="button" className="secondary" onClick={onClose}>Batal</button>
-          <button className="primary" type="submit">{initial ? 'Simpan perubahan' : 'Simpan transaksi'}</button>
+
+        {/* Quick Chips */}
+        <div className="keypad-quick-chips">
+          <button type="button" className="keypad-chip" onClick={() => addQuick(10000)}>+10rb</button>
+          <button type="button" className="keypad-chip" onClick={() => addQuick(20000)}>+20rb</button>
+          <button type="button" className="keypad-chip" onClick={() => addQuick(50000)}>+50rb</button>
+          <button type="button" className="keypad-chip" onClick={() => addQuick(100000)}>+100rb</button>
         </div>
-      </form>
+
+        {/* 4x4 Calculator Keypad */}
+        <div className="keypad-grid-4x4">
+          {/* Row 1: 1, 2, 3, ÷ */}
+          <button type="button" className="keypad-key" onClick={() => pressDigit('1')}>1</button>
+          <button type="button" className="keypad-key" onClick={() => pressDigit('2')}>2</button>
+          <button type="button" className="keypad-key" onClick={() => pressDigit('3')}>3</button>
+          <button type="button" className="keypad-key key-op" onClick={() => pressOp('÷')}>÷</button>
+
+          {/* Row 2: 4, 5, 6, × */}
+          <button type="button" className="keypad-key" onClick={() => pressDigit('4')}>4</button>
+          <button type="button" className="keypad-key" onClick={() => pressDigit('5')}>5</button>
+          <button type="button" className="keypad-key" onClick={() => pressDigit('6')}>6</button>
+          <button type="button" className="keypad-key key-op" onClick={() => pressOp('×')}>×</button>
+
+          {/* Row 3: 7, 8, 9, − */}
+          <button type="button" className="keypad-key" onClick={() => pressDigit('7')}>7</button>
+          <button type="button" className="keypad-key" onClick={() => pressDigit('8')}>8</button>
+          <button type="button" className="keypad-key" onClick={() => pressDigit('9')}>9</button>
+          <button type="button" className="keypad-key key-op" onClick={() => pressOp('−')}>−</button>
+
+          {/* Row 4: 0, 000, ⌫, + */}
+          <button type="button" className="keypad-key" onClick={() => pressDigit('0')}>0</button>
+          <button type="button" className="keypad-key key-000" onClick={() => pressDigit('000')}>000</button>
+          <button type="button" className="keypad-key key-backspace" onClick={backspace} aria-label="Hapus digit">⌫</button>
+          <button type="button" className="keypad-key key-op" onClick={() => pressOp('+')}>+</button>
+        </div>
+
+        {/* Compact metadata inputs */}
+        <div className="form" style={{ marginTop: '12px' }}>
+          <Field label="Nama Transaksi">
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Contoh: Makan siang, Kopi, Gaji bulanan"
+            />
+          </Field>
+
+          <div className="form-grid">
+            <Field label="Kategori">
+              <div className="select-input-wrap">
+                <select value={category} onChange={e => setCategory(e.target.value)}>
+                  {options.map(item => <option key={item}>{item}</option>)}
+                </select>
+                <CaretDown size={14} />
+              </div>
+            </Field>
+            <Field label="Tanggal">
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+            </Field>
+          </div>
+
+          <Field label="Catatan (opsional)">
+            <input value={note} onChange={e => setNote(e.target.value)} placeholder="Detail tambahan singkat" />
+          </Field>
+
+          {error && <p className="form-error" role="alert">{error}</p>}
+
+          <div className="modal-actions">
+            <button type="button" className="secondary" onClick={onClose}>Batal</button>
+            <button className="primary" type="button" onClick={submit}>
+              {initial ? 'Simpan Perubahan' : 'Simpan Transaksi'}
+            </button>
+          </div>
+        </div>
+      </div>
     </ModalShell>
   )
 }
@@ -1072,26 +1499,26 @@ function GoalModal({ initial, onClose, onSave }) {
     onSave({ ...form, name: form.name.trim(), target: Number(form.target), saved: Number(form.saved) || 0 })
   }
   return (
-    <ModalShell title={initial ? 'Ubah wishlist' : 'Tambah wishlist'} subtitle="Tentukan target dan batas waktunya." onClose={onClose}>
+    <ModalShell title={initial ? 'Ubah Wishlist' : 'Tambah Wishlist'} subtitle="Tentukan target dan batas waktunya." onClose={onClose}>
       <form className="form" onSubmit={submit}>
-        <Field label="Nama wishlist">
-          <input autoFocus value={form.name} onChange={event => update('name', event.target.value)} placeholder="Contoh: Kamera Sony, Liburan ke Bali" />
+        <Field label="Nama Wishlist">
+          <input autoFocus value={form.name} onChange={event => update('name', event.target.value)} placeholder="Contoh: Laptop baru, Liburan" />
         </Field>
         <div className="form-grid">
-          <Field label="Target dana">
+          <Field label="Target Dana">
             <MoneyInput value={form.target} onChange={value => update('target', value)} />
           </Field>
-          <Field label="Sudah terkumpul (opsional)">
+          <Field label="Sudah Terkumpul (opsional)">
             <MoneyInput value={form.saved} onChange={value => update('saved', value)} />
           </Field>
         </div>
-        <Field label="Target tercapai">
+        <Field label="Target Tercapai">
           <input type="date" value={form.deadline} onChange={event => update('deadline', event.target.value)} />
         </Field>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="secondary" onClick={onClose}>Batal</button>
-          <button className="primary" type="submit">{initial ? 'Simpan perubahan' : 'Simpan wishlist'}</button>
+          <button className="primary" type="submit">{initial ? 'Simpan Perubahan' : 'Simpan Wishlist'}</button>
         </div>
       </form>
     </ModalShell>
@@ -1102,10 +1529,10 @@ function SavingModal({ goal, onClose, onSave }) {
   const [amount, setAmount] = useState('')
   const remaining = Math.max(goal.target - goal.saved, 0)
   return (
-    <ModalShell title="Tambah tabungan" subtitle={`Untuk ${goal.name}`} onClose={onClose}>
+    <ModalShell title="Tambah Tabungan" subtitle={`Untuk ${goal.name}`} onClose={onClose}>
       <form className="form" onSubmit={event => { event.preventDefault(); Number(amount) > 0 && onSave(goal.id, Number(amount)) }}>
         <div className="saving-summary"><span>Sisa target</span><strong>{rupiah.format(remaining)}</strong></div>
-        <Field label="Nominal tabungan">
+        <Field label="Nominal Tabungan">
           <MoneyInput autoFocus value={amount} onChange={setAmount} />
         </Field>
         <div className="quick-amounts">
@@ -1141,7 +1568,16 @@ function MoneyInput({ value, onChange, autoFocus = false }) {
   )
 }
 
-function EmptyState({ icon: Icon, title, text, action, onAction }) { return <div className="empty-state"><span><Icon size={30} /></span><h3>{title}</h3><p>{text}</p>{action && <button className="primary" onClick={onAction}>{action}</button>}</div> }
+function EmptyState({ icon: Icon, doodle, title, text, action, onAction }) {
+  return (
+    <div className="empty-state">
+      {doodle ? doodle : (Icon ? <span><Icon size={26} weight="regular" /></span> : null)}
+      <h3>{title}</h3>
+      <p>{text}</p>
+      {action && <button className="primary" onClick={onAction}>{action}</button>}
+    </div>
+  )
+}
 
 function BudgetModal({ currentLimit, isActive, onClose, onSave }) {
   const [active, setActive] = useState(isActive ?? false)
@@ -1220,7 +1656,7 @@ function DepositSavingsModal({ availableBalance = 0, onClose, onSave }) {
     const num = Number(amount)
     if (!num || num <= 0) return setError('Masukkan nominal uang yang ingin disisihkan.')
     if (availableBalance > 0 && num > availableBalance) {
-      return setError(`Nominal melebihi uang yang siap digunakan (${rupiah.format(availableBalance)}).`)
+      return setError(`Nominal melebihi uang siap pakai (${rupiah.format(availableBalance)}).`)
     }
     onSave(num)
   }
@@ -1236,7 +1672,7 @@ function DepositSavingsModal({ availableBalance = 0, onClose, onSave }) {
       <form className="form" onSubmit={submit}>
         <div className="savings-info-card">
           <div>
-            <span>Uang siap digunakan saat ini</span>
+            <span>Uang siap pakai saat ini</span>
             <strong>{rupiah.format(Math.max(0, availableBalance))}</strong>
           </div>
         </div>
@@ -1293,7 +1729,7 @@ function UseSavingsModal({ savingsReserve, deficit = 0, onClose, onSave }) {
   return (
     <ModalShell
       title="Gunakan Uang Simpanan"
-      subtitle={deficit > 0 ? "Ambil dari dana cadangan untuk menutupi defisit limit bulanan." : "Gunakan dana simpanan untuk dialihkan ke uang siap digunakan."}
+      subtitle={deficit > 0 ? "Ambil dari dana cadangan untuk menutupi defisit limit bulanan." : "Gunakan dana simpanan untuk dialihkan ke uang siap pakai."}
       onClose={onClose}
     >
       <form className="form" onSubmit={submit}>
@@ -1312,8 +1748,8 @@ function UseSavingsModal({ savingsReserve, deficit = 0, onClose, onSave }) {
 
         {savingsReserve <= 0 ? (
           <div className="empty-warning" role="alert">
-            <Warning size={20} weight="fill" />
-            <p>Saldo dana simpananmu saat ini Rp 0. Kamu belum memiliki dana cadangan yang bisa digunakan.</p>
+            <Warning size={18} weight="fill" />
+            <p>Saldo dana simpanan saat ini Rp 0. Belum ada dana cadangan yang bisa digunakan.</p>
           </div>
         ) : (
           <>

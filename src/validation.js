@@ -1,4 +1,43 @@
 export const isValidLogin = name => name.trim().length >= 2
+export const isValidEmail = email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim())
+export const isValidPassword = pw => String(pw || '').length >= 6
+
+export const isOperator = c => ['+', '−', '-', '×', '*', '÷', '/'].includes(c)
+
+export const evaluateKeypadExpression = (tokens = []) => {
+  if (!tokens || tokens.length === 0) return 0
+  const nums = []
+  const ops = []
+  for (const t of tokens) {
+    if (isOperator(t)) {
+      const canonical = (t === '*' || t === '×') ? '×' : (t === '/' || t === '÷') ? '÷' : (t === '-' || t === '−') ? '−' : '+'
+      ops.push(canonical)
+    } else {
+      nums.push(parseInt(String(t).replace(/\D/g, ''), 10) || 0)
+    }
+  }
+  if (nums.length === 0) return 0
+  // Pass 1: Multiplication and Division
+  let i = 0
+  while (i < ops.length) {
+    if (ops[i] === '×' || ops[i] === '÷') {
+      const a = nums[i], b = nums[i + 1] !== undefined ? nums[i + 1] : 1
+      const res = ops[i] === '×' ? a * b : (b !== 0 ? Math.floor(a / b) : 0)
+      nums.splice(i, 2, res)
+      ops.splice(i, 1)
+    } else {
+      i++
+    }
+  }
+  // Pass 2: Addition and Subtraction
+  let result = nums[0] || 0
+  for (let j = 0; j < ops.length; j++) {
+    const nextVal = nums[j + 1] !== undefined ? nums[j + 1] : 0
+    if (ops[j] === '+') result += nextVal
+    else if (ops[j] === '−') result -= nextVal
+  }
+  return Math.max(0, result)
+}
 
 export const normalizeAmount = value => String(value ?? '').replace(/\D/g, '').replace(/^0+(?=\d)/, '')
 

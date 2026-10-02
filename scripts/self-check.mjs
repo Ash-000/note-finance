@@ -1,8 +1,25 @@
 import assert from 'node:assert/strict'
-import { amountSizeClass, buildDonutStops, calculateBudgetStatus, formatAmountInput, isDateInPeriod, isValidLogin, normalizeAmount, parseTelegramMessage } from '../src/validation.js'
+import {
+  amountSizeClass, buildDonutStops, calculateBudgetStatus, evaluateKeypadExpression,
+  formatAmountInput, isDateInPeriod, isValidEmail, isValidLogin, isValidPassword,
+  normalizeAmount, parseTelegramMessage
+} from '../src/validation.js'
 
 assert.equal(isValidLogin('Raka'), true)
 assert.equal(isValidLogin('R'), false)
+assert.equal(isValidEmail('test@example.com'), true)
+assert.equal(isValidEmail('invalid-email'), false)
+assert.equal(isValidPassword('secret123'), true)
+assert.equal(isValidPassword('123'), false)
+
+// Keypad calculator evaluation assertions
+assert.equal(evaluateKeypadExpression(['50000', '+', '25000']), 75000)
+assert.equal(evaluateKeypadExpression(['100000', '−', '30000']), 70000)
+assert.equal(evaluateKeypadExpression(['15000', '×', '3']), 45000)
+assert.equal(evaluateKeypadExpression(['50000', '÷', '2']), 25000)
+assert.equal(evaluateKeypadExpression(['20000', '+', '10000', '×', '2']), 40000) // precedence: 10000*2 + 20000 = 40000
+assert.equal(evaluateKeypadExpression(['0']), 0)
+assert.equal(evaluateKeypadExpression([]), 0)
 assert.equal(normalizeAmount('Rp 001.250.000'), '1250000')
 assert.equal(formatAmountInput('1250000'), '1.250.000')
 assert.equal(formatAmountInput(''), '')

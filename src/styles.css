@@ -1936,3 +1936,188 @@ body { background: var(--bg); }
 .spin {
   animation: spin-anim 1s linear infinite;
 }
+
+/* --- GoPay Calculator Keypad 4x4 --- */
+.keypad-modal {
+  max-width: 440px;
+  width: 100%;
+}
+.keypad-display-hero {
+  padding: 16px 20px;
+  background: var(--surface-2);
+  border-radius: 16px;
+  text-align: center;
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.keypad-expr-line {
+  min-height: 20px;
+  font-size: 13px;
+  color: var(--muted);
+  font-family: var(--number-font);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+.keypad-amount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+.keypad-currency {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.keypad-amount-val {
+  font-size: 38px;
+  font-weight: 800;
+  font-family: var(--number-font);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1;
+}
+.keypad-amount-val.medium {
+  font-size: 30px;
+}
+.keypad-amount-val.small {
+  font-size: 24px;
+}
+.keypad-quick-chips {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.keypad-chip {
+  flex: 1;
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  background: var(--accent-2);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 100ms ease, background-color 100ms ease;
+}
+.keypad-chip:active {
+  transform: scale(0.94);
+}
+.keypad-grid-4x4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.keypad-key {
+  height: 50px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 700;
+  font-family: var(--number-font);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 80ms ease, background-color 80ms ease;
+  user-select: none;
+}
+.keypad-key:active {
+  transform: scale(0.92);
+  background: var(--surface-2);
+}
+.keypad-key.key-000 {
+  font-size: 14px;
+  background: var(--accent-2);
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.keypad-key.key-backspace {
+  background: var(--expense-bg);
+  color: var(--expense);
+  border-color: color-mix(in srgb, var(--expense) 20%, transparent);
+}
+.keypad-key.key-op {
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  color: #d97706;
+  border-color: color-mix(in srgb, #f59e0b 25%, transparent);
+  font-size: 21px;
+}
+[data-theme="dark"] .keypad-key.key-op {
+  background: rgba(251, 146, 60, 0.12);
+  color: #fdba74;
+  border-color: rgba(251, 146, 60, 0.2);
+}
+.keypad-submit-btn {
+  width: 100%;
+  margin-top: 14px;
+  min-height: 48px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.auth-switch-text {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.auth-switch-text button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0 4px;
+}
+
+/* --- Minimal Doodles Design Accents --- */
+.doodle-squiggle {
+  display: block;
+  width: 100%;
+  max-width: 160px;
+  height: 8px;
+  color: var(--accent);
+  margin-top: 4px;
+}
+.doodle-sparkle {
+  color: #f59e0b;
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 4px;
+}
+.doodle-arrow {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.panel, .balance-card, .bv-card, .goal-card, .login-card {
+  border-radius: 22px 20px 24px 21px;
+}
+.keypad-chip:nth-child(1) { transform: rotate(-1.2deg); }
+.keypad-chip:nth-child(2) { transform: rotate(1.4deg); }
+.keypad-chip:nth-child(3) { transform: rotate(-0.8deg); }
+.keypad-chip:nth-child(4) { transform: rotate(1.1deg); }
+.keypad-chip:hover {
+  transform: scale(1.04) rotate(0deg);
+}
+.doodle-hand-note {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.doodle-empty-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
